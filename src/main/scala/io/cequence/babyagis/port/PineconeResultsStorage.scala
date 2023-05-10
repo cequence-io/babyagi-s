@@ -27,8 +27,6 @@ class PineconeResultsStorage(
   private val pineconeVectorService: PineconeVectorService = Await.result(init, 2 minutes)
 
   def init = {
-    println("namespace: " + namespace)
-
     val dimension = if (!llm_model.startsWith("llama")) 1536 else 5120
 
     for {
@@ -66,23 +64,15 @@ class PineconeResultsStorage(
     }
   }
 
-  type Dict = Map[String, String]
+  type Dict = Map[String, Any]
 
   def add(
     task: Dict,
     result: String,
     result_id: String
-  ) = {
-    println("namespace: " + namespace)
-
-    val enriched_result = Map(
-      "data" -> result
-    )
-
+  ) =
     for {
-      vector <- get_embedding(
-        enriched_result("data")
-      )
+      vector <- get_embedding(result)
 
       _ <- pineconeVectorService.upsert(
         vectors = Seq(
@@ -91,7 +81,7 @@ class PineconeResultsStorage(
             vector,
             sparseValues = None,
             metadata = Map(
-              "task" -> task("task_name"),
+              "task" -> task("task_name").toString,
               "result" -> result
             )
           )
@@ -99,13 +89,10 @@ class PineconeResultsStorage(
         namespace
       )
     } yield
-      vector
-  }
+      ()
 
 
-  def query(query: String, top_results_num: Int): Future[Seq[String]] = {
-    println("namespace: " + namespace)
-
+  def query(query: String, top_results_num: Int): Future[Seq[String]] =
     for {
       query_embedding <- get_embedding(query)
 
@@ -123,7 +110,6 @@ class PineconeResultsStorage(
 
       sortedResults.flatMap(_.metadata.map(_("task")))
     }
-  }
 
   // Get embedding for the text
   def get_embedding(text: String): Future[Seq[Double]] = {

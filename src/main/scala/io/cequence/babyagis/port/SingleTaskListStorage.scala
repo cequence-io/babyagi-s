@@ -3,7 +3,7 @@ package io.cequence.babyagis.port
 import scala.collection.mutable.{ Buffer => MutableBuffer }
 
 class SingleTaskListStorage {
-  type Dict = Map[String, String]
+  type Dict = Map[String, Any]
 
   var tasks: MutableBuffer[Dict] = MutableBuffer()  // TODO: deque?
 
@@ -28,5 +28,5 @@ class SingleTaskListStorage {
   }
 
   def get_task_names: Seq[String] =
-    tasks.map(t => t("task_name"))
+    tasks.map(t => t("task_name").toString)
 }

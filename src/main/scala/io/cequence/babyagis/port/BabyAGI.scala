@@ -21,16 +21,16 @@ object BabyAGI {
   // Engine configuration
 
   // Model: GPT, LLAMA (not supported), HUMAN, etc
-  val LLM_MODEL = Properties.envOrElse("LLM_MODEL",
-    Properties.envOrElse("OPENAI_API_MODEL", "gpt-3.5-turbo")
+  val LLM_MODEL = envPropOrElse("LLM_MODEL",
+    envPropOrElse("OPENAI_API_MODEL", "gpt-3.5-turbo")
   ).toLowerCase
 
   // API Keys
   // also additional OPENAI_API_ORG_ID is supported here
-  val OPENAI_API_KEY = Properties.envOrNone("OPENAI_API_KEY")
+  val OPENAI_API_KEY = envPropOrNone("OPENAI_API_KEY")
 
   val openAIService = if (!(LLM_MODEL.startsWith("llama") || LLM_MODEL.startsWith("human")) || OPENAI_API_KEY.isDefined) {
-    val OPENAI_API_ORG_ID = Properties.envOrNone("OPENAI_API_ORG_ID")
+    val OPENAI_API_ORG_ID = envPropOrNone("OPENAI_API_ORG_ID")
     assert(OPENAI_API_KEY.isDefined, "\033[91m\033[1m" + "OPENAI_API_KEY environment variable is missing" + "\033[0m\033[0m")
 
     Some(OpenAIServiceFactory(OPENAI_API_KEY.get, OPENAI_API_ORG_ID))
@@ -39,20 +39,20 @@ object BabyAGI {
   }
 
   // Table config
-  val RESULTS_STORE_NAME = Properties.envOrSome("RESULTS_STORE_NAME", Properties.envOrNone("TABLE_NAME"))
+  val RESULTS_STORE_NAME = envPropOrSome("RESULTS_STORE_NAME", envPropOrNone("TABLE_NAME"))
   assert(RESULTS_STORE_NAME.isDefined, "\033[91m\033[1m" + "RESULTS_STORE_NAME environment variable is missing" + "\033[0m\033[0m")
 
   // Run configuration
-  val INSTANCE_NAME = Properties.envOrElse("INSTANCE_NAME", Properties.envOrElse("BABY_NAME", "BabyAGI"))
+  val INSTANCE_NAME = envPropOrElse("INSTANCE_NAME", envPropOrElse("BABY_NAME", "BabyAGI"))
   val COOPERATIVE_MODE = "none"
   val JOIN_EXISTING_OBJECTIVE = false
 
   // Goal configuration
-  val OBJECTIVE = Properties.envOrElse("OBJECTIVE", "")
-  val INITIAL_TASK = Properties.envOrElse("INITIAL_TASK", Properties.envOrElse("FIRST_TASK", ""))
+  val OBJECTIVE = envPropOrElse("OBJECTIVE", "")
+  val INITIAL_TASK = envPropOrElse("INITIAL_TASK", envPropOrElse("FIRST_TASK", ""))
 
   // Model configuration
-  val OPENAI_TEMPERATURE = Properties.envOrElse("OPENAI_TEMPERATURE", "0.0").toDouble
+  val OPENAI_TEMPERATURE = envPropOrElse("OPENAI_TEMPERATURE", "0.0").toDouble
 
   // Extensions support - skipped
 
@@ -97,10 +97,10 @@ object BabyAGI {
     println("\033[93m\033[1m" + f"\nJoining to help the objective" + "\033[0m\033[0m")
 
   // Initialize results storage
-  val PINECONE_API_KEY = Properties.envOrElse("PINECONE_API_KEY", "")
+  val PINECONE_API_KEY = envPropOrElse("PINECONE_API_KEY", "")
 
-  val results_storage = if (PINECONE_API_KEY.nonEmpty) {
-    val PINECONE_ENVIRONMENT = Properties.envOrElse("PINECONE_ENVIRONMENT", "")
+  lazy val results_storage = if (PINECONE_API_KEY.nonEmpty) {
+    val PINECONE_ENVIRONMENT = envPropOrElse("PINECONE_ENVIRONMENT", "")
     assert(PINECONE_ENVIRONMENT.nonEmpty, "\033[91m\033[1m" + "PINECONE_ENVIRONMENT environment variable is missing" + "\033[0m\033[0m")
 
     println("\nReplacing results storage: " + "\033[93m\033[1m" + "Pinecone" + "\033[0m\033[0m")
@@ -126,11 +126,8 @@ object BabyAGI {
     prompt: String,
     model: String = LLM_MODEL,
     temperature: Double = OPENAI_TEMPERATURE,
-    max_tokens: Int = 1000 // originally 100 (too small)
-  ): Future[String] = {
-    println("prompt")
-    println(prompt)
-
+    max_tokens: Int // originally 100 (too small)
+  ): Future[String] =
     retryOnOpenAIException(
       failureMessage = "OpenAI API error occurred.",
       log = println(_),
@@ -180,7 +177,6 @@ object BabyAGI {
         }
       }
     )
-  }
 
   private def retryOnOpenAIException[T](
     failureMessage: String,
@@ -208,52 +204,29 @@ object BabyAGI {
     retryAux(1)
   }
 
+  private def envPropOrElse(name: String, value: String) =
+    envPropOrNone(name).getOrElse(value)
+
+  private def envPropOrSome(name: String, value: Option[String]) =
+    envPropOrNone(name).orElse(value)
+  private def envPropOrNone(name: String): Option[String] =
+    Properties.envOrSome(name, Properties.propOrNone(name))
+
   private def task_creation_agent(
     objective: String,
-    result: Map[String, String],
+    result: Map[String, String], // note: only "data" attribute is present in the result
     task_description: String,
     task_list: Seq[String]
-  ): Future[Seq[Map[String, String]]] = {
-    // note: only "data" attribute is present in the result
+  ): Future[Seq[Map[String, Any]]] = {
+    val prompt = task_creation_agent_prompt(objective, result, task_description, task_list)
 
-    var prompt_new =
-      s"""
-        |You are to use the result from an execution agent to create new tasks with the following objective: ${objective}.
-        |The last completed task has the result: \n${result("data")}
-        |This result was based on this task description: ${task_description}.\n""".stripMargin
-
-    if (task_list.nonEmpty)
-      prompt_new += f"These are incomplete tasks: ${task_list.mkString(", ")}\n"
-
-    prompt_new += "Based on the result, create a list of new tasks to be completed in order to meet the objective."
-
-    if (task_list.nonEmpty)
-      prompt_new += "These new tasks must not overlap with incomplete tasks."
-
-    prompt_new += """
-        |Return all the new tasks, with one task per line in your response. The result must be a numbered list in the format:
-        |
-        |#. First task
-        |#. Second task
-        |
-        |The number of each entry must be followed by a period.
-        |Do not include any headers before your numbered list. Do not follow your numbered list with any other output.""".stripMargin
-
-//    val prompt_old =
-//      s"""
-//        |You are a task creation AI that uses the result of an execution agent to create new tasks with the following objective: $objective,
-//        |The last completed task has the result: {$result_items_string}.
-//        |This result was based on this task description: $task_description. These are incomplete tasks: ${task_list.mkString(", ")}.
-//        |Based on the result, create new tasks to be completed by the AI system that do not overlap with incomplete tasks.
-//        |Return the tasks as an array.""".stripMargin
-
-    println(s"\n************** TASK CREATION AGENT PROMPT *************\n${prompt_new}")
+    println(s"\n************** TASK CREATION AGENT PROMPT *************\n${prompt}\n")
 
     openai_call(
-      prompt_new,
+      prompt,
       max_tokens = 2000
     ).map { response =>
-      println(s"\n************* TASK CREATION AGENT RESPONSE ************\n${response}")
+      println(s"\n************* TASK CREATION AGENT RESPONSE ************\n${response}\n")
 
       val new_tasks = response.split("\n").flatMap { task_string =>
         val task_parts = task_string.strip().split("\\.", 2)
@@ -272,28 +245,48 @@ object BabyAGI {
     }
   }
 
+  protected[port] def task_creation_agent_prompt(
+    objective: String,
+    result: Map[String, String], // note: only "data" attribute is present in the result
+    task_description: String,
+    task_list: Seq[String]
+  ): String = {
+    var prompt =
+      s"""
+         |You are to use the result from an execution agent to create new tasks with the following objective: ${objective}.
+         |The last completed task has the result: \n${result("data")}
+         |This result was based on this task description: ${task_description}.\n""".stripMargin
+
+    if (task_list.nonEmpty)
+      prompt += f"These are incomplete tasks: ${task_list.mkString(", ")}\n"
+
+    prompt += "Based on the result, create a list of new tasks to be completed in order to meet the objective. "
+
+    if (task_list.nonEmpty)
+      prompt += "These new tasks must not overlap with incomplete tasks. "
+
+    prompt +=
+      """
+        |Return all the new tasks, with one task per line in your response. The result must be a numbered list in the format:
+        |
+        |#. First task
+        |#. Second task
+        |
+        |The number of each entry must be followed by a period.
+        |Do not include any headers before your numbered list. Do not follow your numbered list with any other output.""".stripMargin
+
+    prompt
+  }
+
   private def prioritization_agent: Future[Unit] = {
     val task_names = tasks_storage.get_task_names
-    val next_task_id = tasks_storage.next_task_id
 
-    val prompt =
-      s"""
-      |You are tasked with cleaning the format and re-prioritizing the following tasks: ${task_names.mkString(", ")}.
-      |Consider the ultimate objective of your team: ${OBJECTIVE}.
-      |Tasks should be sorted from highest to lowest priority.
-      |Higher-priority tasks are those that act as pre-requisites or are more essential for meeting the objective.
-      |Do not remove any tasks. Return the result as a numbered list in the format:
-      |
-      |#. First task
-      |#. Second task
-      |
-      |The entries are consecutively numbered, starting with 1. The number of each entry must be followed by a period.
-      |Do not include any headers before your numbered list. Do not follow your numbered list with any other output.""".stripMargin
+    val prompt = prioritization_agent_prompt(task_names, OBJECTIVE)
 
-    println(s"\n************** TASK PRIORITIZATION AGENT PROMPT *************\n${prompt}")
+    println(s"\n************** TASK PRIORITIZATION AGENT PROMPT *************\n${prompt}\n")
 
     openai_call(prompt, max_tokens = 2000).map { response =>
-      println(s"\n************* TASK PRIORITIZATION AGENT RESPONSE ************\n${response}")
+      println(s"\n************* TASK PRIORITIZATION AGENT RESPONSE ************\n${response}\n")
 
       val new_tasks = if (response.contains("\n")) response.split("\n").toSeq else Seq(response)
 
@@ -313,6 +306,23 @@ object BabyAGI {
     }
   }
 
+  protected[port] def prioritization_agent_prompt(
+    task_names: Seq[String],
+    objective: String
+  ): String =
+    s"""
+      |You are tasked with cleaning the format and re-prioritizing the following tasks: ${task_names.mkString(", ")}.
+      |Consider the ultimate objective of your team: ${objective}.
+      |Tasks should be sorted from highest to lowest priority.
+      |Higher-priority tasks are those that act as pre-requisites or are more essential for meeting the objective.
+      |Do not remove any tasks. Return the result as a numbered list in the format:
+      |
+      |#. First task
+      |#. Second task
+      |
+      |The entries are consecutively numbered, starting with 1. The number of each entry must be followed by a period.
+      |Do not include any headers before your numbered list. Do not follow your numbered list with any other output.""".stripMargin
+
   /**
    * Executes a task based on the given objective and previous context.
    *
@@ -331,17 +341,27 @@ object BabyAGI {
         // println("\n*******RELEVANT CONTEXT******\n")
         // println(context)
 
-        var prompt = s"Perform one task based on the following objective: $objective.\n"
-
-        if (context.nonEmpty)
-           prompt += s"Take into account these previously completed tasks:${context.mkString("\n")}"
-
-        prompt += s"\nYour task: ${task}\nResponse:"
+        val prompt = execution_agent_prompt(objective, task, context)
 
         openai_call(prompt, max_tokens = 2000)
       }
     } yield
       response
+
+  protected[port] def execution_agent_prompt(
+    objective: String,
+    task: String,
+    context: Seq[String]
+  ): String = {
+    var prompt = s"Perform one task based on the following objective: $objective.\n"
+
+    if (context.nonEmpty)
+      prompt += s"Take into account these previously completed tasks:${context.mkString("\n")}"
+
+    prompt += s"\nYour task: ${task}\nResponse:"
+
+    prompt
+  }
 
   /**
    * Retrieves context for a given query from an index of tasks.
@@ -360,21 +380,14 @@ object BabyAGI {
       results
     }
 
-  // Note: to be consistent with the original Python-based impl, we need to wrap it like this
-  @Deprecated
-  private def toPythonSeqString[T](seq: Seq[String]): String = {
-    val itemsString = seq.map(s => s"'$s'").mkString(", ")
-    s"[$itemsString]"
-  }
-
   def user_input_await(prompt: String): String = {
     println("\033[94m\033[1m" + "\n> COPY FOLLOWING TEXT TO CHATBOT\n" + "\033[0m\033[0m")
     println(prompt)
-    println("\033[91m\033[1m" + "\n AFTER PASTING, PRESS: (ENTER) TO FINISH\n" + "\033[0m\033[0m")
+    println("\033[91m\033[1m" + "\n AFTER PASTING, PRESS: (ENTER / EMPTY LINE) TO FINISH\n" + "\033[0m\033[0m")
     println("\033[96m\033[1m" + "\n> PASTE YOUR RESPONSE:\n" + "\033[0m\033[0m")
-    // TODO: add while
-    val input_text = scala.io.StdIn.readLine()
-    input_text.strip()
+
+    val input_text = Stream.continually(scala.io.StdIn.readLine()).takeWhile(_.strip != "")
+    input_text.mkString("\n").strip
   }
 
   // Add the initial task if starting new objective
@@ -391,6 +404,7 @@ object BabyAGI {
   //////////
   def main(args: Array[String]) {
     var loop = true
+    var iteration_id = 0
     while (loop) {
       // As long as there are tasks in the storage...
       if (!tasks_storage.is_empty) {
@@ -407,7 +421,7 @@ object BabyAGI {
 
         val processFuture = for {
           // Send to execution function to complete the task based on the context
-          result <- execution_agent(OBJECTIVE, task("task_name"))
+          result <- execution_agent(OBJECTIVE, task("task_name").toString)
 
           _ = {
             println("\033[93m\033[1m" + "\n*****TASK RESULT*****\n" + "\033[0m\033[0m")
@@ -422,7 +436,11 @@ object BabyAGI {
           // since we don't do enrichment currently
           // vector = enrichedResult("data") // don't needed
 
-          result_id = s"result_${task("task_id")}"
+          // result_id = s"result_${task("task_id")}"
+          result_id = {
+            iteration_id += 1
+            s"result_${iteration_id}"
+          }
 
           _ <- results_storage.add(task, result, result_id)
 
@@ -431,14 +449,17 @@ object BabyAGI {
           new_tasks <- task_creation_agent(
             OBJECTIVE,
             enrichedResult,
-            task("task_name"),
+            task("task_name").toString,
             tasks_storage.get_task_names
           )
 
-          _ = for (new_task <- new_tasks) {
-            val newTaskWithID = new_task + ("task_id" -> tasks_storage.next_task_id.toString)
-            println(new_task)
-            tasks_storage.append(newTaskWithID)
+          _ = {
+            println("Adding new tasks to task_storage")
+            for (new_task <- new_tasks) {
+              val newTaskWithID = new_task + ("task_id" -> tasks_storage.next_task_id)
+              println(newTaskWithID.toString.stripPrefix("Map"))
+              tasks_storage.append(newTaskWithID)
+            }
           }
 
           _ <- if (!JOIN_EXISTING_OBJECTIVE) {
