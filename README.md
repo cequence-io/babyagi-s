@@ -7,7 +7,7 @@ Note that this is a port of the original Python code as of 5.5.2023, and it is n
 
 The runnable app object `BabyAGI` ([here](./src/main/scala/io/cequence/babyagis/port/BabyAGI.scala)) follows the original Python code as closely as possible with two exceptions:
 - There is no LLAMA support, hence OpenAI API is mandatory (unless you run in `human` mode) 
-- The only supported vector database/provider is Pinecone (no Chroma / Weaviate)
+- The only supported vector database/provider is [Pinecone](https://www.pinecone.io/) (no Chroma / Weaviate)
 
 To cover this functionality we rely on [OpenAI](https://github.com/cequence-io/openai-scala-client) and [Pinecone](https://github.com/cequence-io/pinecone-scala) Scala clients.
 
