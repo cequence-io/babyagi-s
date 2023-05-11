@@ -1,15 +1,15 @@
 # BabyAGI - Scala Port and Beyond
 [![version](https://img.shields.io/badge/version-0.0.1-green.svg)](https://cequence.io) [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/licenses/MIT)
 
-This project provides a line-by-line port of [BabyAGI](https://github.com/yoheinakajima/babyagi) in Scala to serve as a starting point for further explorations and customizations in Scala or any other JVM language. This means we haven't aimed to optimize or refactor anything besides a few parts where direct mapping between Python and Scala code was not possible. To validate consistency with the original Python version we also provide two test suites for [prompts](./src/test/scala/io/cequence/babyagis/port/BabyAGIPromptSpec.scala) and [the task storage](./src/test/scala/io/cequence/babyagis/port/BabyAGITaskStorageSpec.scala).
+This project provides a line-by-line port of [BabyAGI](https://github.com/yoheinakajima/babyagi) in Scala to serve as a starting point for further explorations and customizations in Scala or any other JVM language. This means we haven't aimed to optimize or refactor anything besides a few parts where a direct mapping from Python to Scala code wasn't possible. To validate consistency with the original Python version we also provide two test suites for [prompts](./src/test/scala/io/cequence/babyagis/port/BabyAGIPromptSpec.scala) and [the task storage](./src/test/scala/io/cequence/babyagis/port/BabyAGITaskStorageSpec.scala).
 
-Note that this is a port of the original Python code at 5.5.2023, and it is not guaranteed to be in sync with the latest version of the original project in the future.
+Note that this is a port of the original Python code as of 5.5.2023, and it is not guaranteed to be in sync with the latest version of the original project in the future.
 
 The runnable app object `BabyAGI` ([here](./src/main/scala/io/cequence/babyagis/port/BabyAGI.scala)) follows the original Python code as closely as possible with two exceptions:
 - There is no LLAMA support, hence OpenAI API is mandatory (unless you run in `human` mode) 
 - The only supported vector database/provider is Pinecone (no Chroma / Weaviate)
 
-To provide this functionality we rely on [OpenAI](https://github.com/cequence-io/openai-scala-client) and [Pinecone](https://github.com/cequence-io/pinecone-scala) Scala clients.
+To cover this functionality we rely on [OpenAI](https://github.com/cequence-io/openai-scala-client) and [Pinecone](https://github.com/cequence-io/pinecone-scala) Scala clients.
 
 **✔️ Important**: We are working now on an improved, cleaner version of BabyAGI, which means we will be functionally and architecturally diverging from the "reference point" - the original ported Scala version.
 
