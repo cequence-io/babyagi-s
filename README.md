@@ -27,7 +27,7 @@ The following set of environmental variables (as in the Python version) is expec
 
 ## Execution 🚀
 
-Simple run `BabyAGI` in the `port` package - can be found [here](./src/main/scala/io/cequence/babyagis/port/BabyAGI.scala).
+Simply run `BabyAGI` in the `port` package - can be found [here](./src/main/scala/io/cequence/babyagis/port/BabyAGI.scala).
 
 ## License ⚖️
 
