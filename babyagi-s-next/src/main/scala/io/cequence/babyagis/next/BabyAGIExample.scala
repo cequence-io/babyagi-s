@@ -3,7 +3,7 @@ package io.cequence.babyagis.next
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.typesafe.config.ConfigFactory
-import io.cequence.babyagis.next.providers.{OpenAILLMProvider, PineconeVectorStoreProvider}
+import io.cequence.babyagis.next.providers.{OpenAICompletionProvider, OpenAIEmbeddingsProvider, PineconeVectorStoreProvider}
 import io.cequence.openaiscala.domain.ModelId
 
 import scala.concurrent.{Await, ExecutionContext}
@@ -16,13 +16,20 @@ object BabyAGIExample extends App {
   private implicit val materializer: Materializer = Materializer(actorSystem)
 
   // using baby-agi-s-config.conf which expects:
-  // - OPENAI_SCALA_CLIENT_API_KEY, OPENAI_SCALA_CLIENT_ORG_ID (optional), PINECONE_SCALA_CLIENT_API_KEY, and PINECONE_SCALA_CLIENT_ENV
+  // - OPENAI_SCALA_CLIENT_API_KEY
+  // - OPENAI_SCALA_CLIENT_ORG_ID (optional)
+  // - PINECONE_SCALA_CLIENT_API_KEY
+  // - PINECONE_SCALA_CLIENT_ENV
   private val config = ConfigFactory.load("baby-agi-s-config.conf")
 
-  private val llmService = OpenAILLMProvider(
-    completionModel = ModelId.gpt_3_5_turbo,
-    embeddingModel = ModelId.text_embedding_ada_002,
+  private val completionProvider = OpenAICompletionProvider(
+    modelName = ModelId.gpt_3_5_turbo,
     temperature = 0,
+    config
+  )
+
+  private val embeddingsProvider = OpenAIEmbeddingsProvider(
+    modelName = ModelId.text_embedding_ada_002,
     config
   )
 
@@ -38,7 +45,8 @@ object BabyAGIExample extends App {
     objective = "Save the planet Earth from the evil aliens",
     initialTask = "Develop a task list",
     vectorStore,
-    llmService
+    completionProvider,
+    embeddingsProvider
   )
 
   babyAGI.exec

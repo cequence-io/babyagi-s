@@ -1,6 +1,6 @@
 package io.cequence.babyagis.next
 
-import io.cequence.babyagis.next.providers.{LLMProvider, VectorStoreProvider}
+import io.cequence.babyagis.next.providers.{CompletionProvider, EmbeddingsProvider, VectorStoreProvider}
 import io.cequence.babyagis.next.SingleTaskListStorage
 
 import scala.concurrent.duration.DurationInt
@@ -10,7 +10,8 @@ class BabyAGI(
   objective: String,
   initialTask: String,
   vectorStore: VectorStoreProvider,
-  llmService: LLMProvider)(
+  completionProvider: CompletionProvider,
+  embeddingsProvider: EmbeddingsProvider)(
   implicit ec: ExecutionContext
 ) {
   // Initialize tasks storage
@@ -29,7 +30,7 @@ class BabyAGI(
 
     println(s"\n************** TASK CREATION AGENT PROMPT *************\n${prompt}\n")
 
-    llmService.createCompletion(
+    completionProvider.createCompletion(
       prompt,
       maxTokens = 2000
     ).map { response =>
@@ -92,7 +93,7 @@ class BabyAGI(
 
     println(s"\n************** TASK PRIORITIZATION AGENT PROMPT *************\n${prompt}\n")
 
-    llmService.createCompletion(prompt, maxTokens = 2000).map { response =>
+    completionProvider.createCompletion(prompt, maxTokens = 2000).map { response =>
       println(s"\n************* TASK PRIORITIZATION AGENT RESPONSE ************\n${response}\n")
 
       val new_tasks = if (response.contains("\n")) response.split("\n").toSeq else Seq(response)
@@ -150,7 +151,7 @@ class BabyAGI(
 
         val prompt = executionAgentPrompt(objective, task, context)
 
-        llmService.createCompletion(prompt, maxTokens = 2000)
+        completionProvider.createCompletion(prompt, maxTokens = 2000)
       }
     } yield
       response
@@ -194,7 +195,7 @@ class BabyAGI(
 
   private def getEmbedding(text: String) = {
     val replacedText = text.replaceAll("\n", " ")
-    llmService.createEmbeddings(Seq(replacedText)).map(_.head)
+    embeddingsProvider.createEmbeddings(Seq(replacedText)).map(_.head)
   }
 
   private def userInputAwait(prompt: String): String = {
@@ -209,11 +210,12 @@ class BabyAGI(
 
   def exec = {
     println("\033[95m\033[1m" + "\n*****CONFIGURATION*****\n" + "\033[0m\033[0m")
-    println(s"Name  : ${instanceName}")
-    println(s"Mode  : ${mode}")
-    println(s"LLM   : ${llmService.modelName}")
+    println(s"Name             : ${instanceName}")
+    println(s"Mode             : ${mode}")
+    println(s"Completion Model : ${completionProvider.modelName}")
+    println(s"Embeddings Model : ${embeddingsProvider.modelName}")
 
-    if (llmService.modelName.startsWith("OpenAI: gpt-4"))
+    if (completionProvider.modelName.startsWith("OpenAI: gpt-4"))
       println(
         "\033[91m\033[1m"
           + "\n*****USING GPT-4. POTENTIALLY EXPENSIVE. MONITOR YOUR COSTS*****"
