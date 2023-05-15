@@ -1,7 +1,7 @@
 package io.cequence.babyagis.next
 
 import io.cequence.babyagis.next.providers.{LLMProvider, VectorStoreProvider}
-import io.cequence.babyagis.port.SingleTaskListStorage
+import io.cequence.babyagis.next.SingleTaskListStorage
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}

@@ -1,22 +1,36 @@
-organization := "io.cequence"
+import sbt.Keys.test
 
-name := "babyagi-s"
-
-version := "0.0.1"
-
-// Supported Scala versions
+// Supported versions
 val scala212 = "2.12.15"
 val scala213 = "2.13.10"
 val scala3 = "3.2.2"
 
-scalaVersion := scala212
+ThisBuild / organization := "io.cequence"
+ThisBuild / scalaVersion := scala212
+ThisBuild / version := "0.0.1"
+ThisBuild / isSnapshot := false
 
-val openAIScalaVersion = "0.3.2"
-val pineconeScalaVersion = "0.0.1"
+lazy val port = (project in file("babyagi-s-port"))
 
-libraryDependencies ++= Seq(
-  "io.cequence" %% "pinecone-scala-client" % pineconeScalaVersion,
-  "io.cequence" %% "openai-scala-client" % openAIScalaVersion,
-  "org.scalatest" %% "scalatest" % "3.2.15" % "test",
-  "ch.qos.logback" % "logback-classic" % "1.4.7" % Runtime
+lazy val next = (project in file("babyagi-s-next"))
+
+// POM settings for Sonatype
+ThisBuild / homepage := Some(url("https://github.com/cequence-io/babyagi-s"))
+
+ThisBuild / sonatypeProfileName := "io.cequence"
+
+ThisBuild / scmInfo := Some(ScmInfo(url("https://github.com/cequence-io/babyagi-s"), "scm:git@github.com:cequence-io/babyagi-s.git"))
+
+ThisBuild / developers := List(
+  Developer("bnd", "Peter Banda", "peter.banda@protonmail.com", url("https://peterbanda.net"))
 )
+
+ThisBuild / licenses += "MIT" -> url("https://opensource.org/licenses/MIT")
+
+ThisBuild / publishMavenStyle := true
+
+ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
+
+ThisBuild / sonatypeRepository := "https://s01.oss.sonatype.org/service/local"
+
+ThisBuild / publishTo := sonatypePublishToBundle.value
