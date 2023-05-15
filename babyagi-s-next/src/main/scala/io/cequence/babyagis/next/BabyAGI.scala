@@ -30,7 +30,7 @@ class BabyAGI(
 
     println(s"\n************** TASK CREATION AGENT PROMPT *************\n${prompt}\n")
 
-    completionProvider.createCompletion(
+    completionProvider(
       prompt,
       maxTokens = 2000
     ).map { response =>
@@ -93,7 +93,7 @@ class BabyAGI(
 
     println(s"\n************** TASK PRIORITIZATION AGENT PROMPT *************\n${prompt}\n")
 
-    completionProvider.createCompletion(prompt, maxTokens = 2000).map { response =>
+    completionProvider(prompt, maxTokens = 2000).map { response =>
       println(s"\n************* TASK PRIORITIZATION AGENT RESPONSE ************\n${response}\n")
 
       val new_tasks = if (response.contains("\n")) response.split("\n").toSeq else Seq(response)
@@ -151,7 +151,7 @@ class BabyAGI(
 
         val prompt = executionAgentPrompt(objective, task, context)
 
-        completionProvider.createCompletion(prompt, maxTokens = 2000)
+        completionProvider(prompt, maxTokens = 2000)
       }
     } yield
       response
@@ -195,7 +195,7 @@ class BabyAGI(
 
   private def getEmbedding(text: String) = {
     val replacedText = text.replaceAll("\n", " ")
-    embeddingsProvider.createEmbeddings(Seq(replacedText)).map(_.head)
+    embeddingsProvider(Seq(replacedText)).map(_.head)
   }
 
   private def userInputAwait(prompt: String): String = {

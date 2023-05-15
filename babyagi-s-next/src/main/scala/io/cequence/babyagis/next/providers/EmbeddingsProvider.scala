@@ -6,7 +6,7 @@ trait EmbeddingsProvider {
 
   def modelName: String
 
-  def createEmbeddings(
+  def apply(
     input: Seq[String]
   ): Future[Seq[Seq[Double]]]
 }

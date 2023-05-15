@@ -15,7 +15,7 @@ private class OpenAIEmbeddingsProvider(
 
   private val openAIService = OpenAIServiceFactory(config)
 
-  override def createEmbeddings(
+  override def apply(
     input: Seq[String]
   ): Future[Seq[Seq[Double]]] = retryAux(
     openAIService.createEmbeddings(

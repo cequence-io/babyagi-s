@@ -6,7 +6,7 @@ trait CompletionProvider {
 
   def modelName: String
 
-  def createCompletion(
+  def apply(
     prompt: String,
     maxTokens: Int
   ): Future[String]

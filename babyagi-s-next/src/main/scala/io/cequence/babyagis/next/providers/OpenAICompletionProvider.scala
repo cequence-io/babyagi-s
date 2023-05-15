@@ -18,7 +18,7 @@ private class OpenAICompletionProvider(
 
   private val openAIService = OpenAIServiceFactory(config)
 
-  override def createCompletion(
+  override def apply(
     prompt: String,
     maxTokens: Int
   ): Future[String] = retryAux(
