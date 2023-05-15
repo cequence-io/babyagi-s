@@ -198,16 +198,6 @@ class BabyAGI(
     embeddingsProvider(Seq(replacedText)).map(_.head)
   }
 
-  private def userInputAwait(prompt: String): String = {
-    println("\033[94m\033[1m" + "\n> COPY FOLLOWING TEXT TO CHATBOT\n" + "\033[0m\033[0m")
-    println(prompt)
-    println("\033[91m\033[1m" + "\n AFTER PASTING, PRESS: (ENTER / EMPTY LINE) TO FINISH\n" + "\033[0m\033[0m")
-    println("\033[96m\033[1m" + "\n> PASTE YOUR RESPONSE:\n" + "\033[0m\033[0m")
-
-    val input_text = Stream.continually(scala.io.StdIn.readLine()).takeWhile(_.strip != "")
-    input_text.mkString("\n").strip
-  }
-
   def exec = {
     println("\033[95m\033[1m" + "\n*****CONFIGURATION*****\n" + "\033[0m\033[0m")
     println(s"Name             : ${instanceName}")
@@ -222,13 +212,12 @@ class BabyAGI(
           + "\033[0m\033[0m"
       )
 
-// TODO: human mode?
-//    if (LLM_MODEL.startsWith("human"))
-//      println(
-//        "\033[91m\033[1m"
-//          + "\n*****USING HUMAN INPUT*****"
-//          + "\033[0m\033[0m"
-//      )
+    if (completionProvider.modelName.startsWith("human"))
+      println(
+        "\033[91m\033[1m"
+          + "\n*****USING HUMAN INPUT*****"
+          + "\033[0m\033[0m"
+      )
 
 
     println("\033[94m\033[1m" + "\n*****OBJECTIVE*****\n" + "\033[0m\033[0m")

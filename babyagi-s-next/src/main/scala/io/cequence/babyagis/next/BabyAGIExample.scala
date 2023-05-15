@@ -3,7 +3,7 @@ package io.cequence.babyagis.next
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.typesafe.config.ConfigFactory
-import io.cequence.babyagis.next.providers.{OpenAICompletionProvider, OpenAIEmbeddingsProvider, PineconeVectorStoreProvider}
+import io.cequence.babyagis.next.providers.{HumanCompletionProvider, OpenAICompletionProvider, OpenAIEmbeddingsProvider, PineconeVectorStoreProvider}
 import io.cequence.openaiscala.domain.ModelId
 
 import scala.concurrent.{Await, ExecutionContext}
@@ -28,6 +28,8 @@ object BabyAGIExample extends App {
     config
   )
 
+  private val humanCompletionProvider = HumanCompletionProvider()
+
   private val embeddingsProvider = OpenAIEmbeddingsProvider(
     modelName = ModelId.text_embedding_ada_002,
     config
@@ -45,7 +47,7 @@ object BabyAGIExample extends App {
     objective = "Save the planet Earth from the evil aliens",
     initialTask = "Develop a task list",
     vectorStore,
-    completionProvider,
+    completionProvider, // humanCompletionProvider
     embeddingsProvider
   )
 
