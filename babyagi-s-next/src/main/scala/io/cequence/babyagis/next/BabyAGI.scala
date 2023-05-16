@@ -1,7 +1,6 @@
 package io.cequence.babyagis.next
 
 import io.cequence.babyagis.next.providers.{CompletionProvider, EmbeddingsProvider, VectorStoreProvider}
-import io.cequence.babyagis.next.SingleTaskListStorage
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -181,9 +180,10 @@ class BabyAGI(
   private def contextAgent(
     query: String,
     topResultsNum: Int
-  ):  Future[Seq[String]] =
+  ):  Future[Seq[String]] = {
     for {
-      queryEmbedding <- getEmbedding(query)
+      // TODO: since the query is always the objective, the embeddings can be cached
+      queryEmbedding <- getEmbeddings(query)
 
       results <- vectorStore.querySorted(
         queryEmbedding,
@@ -192,8 +192,9 @@ class BabyAGI(
       )
     } yield
       results
+  }
 
-  private def getEmbedding(text: String) = {
+  private def getEmbeddings(text: String) = {
     val replacedText = text.replaceAll("\n", " ")
     embeddingsProvider(Seq(replacedText)).map(_.head)
   }
@@ -271,7 +272,7 @@ class BabyAGI(
             s"result_${iteration_id}"
           }
 
-          queryEmbedding <- getEmbedding(result)
+          queryEmbedding <- getEmbeddings(result)
 
           _ <- vectorStore.add(
             resultId,
