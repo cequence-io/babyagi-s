@@ -6,6 +6,7 @@ import io.cequence.openaiscala.OpenAIScalaClientException
 import io.cequence.openaiscala.domain.settings.{CreateChatCompletionSettings, CreateCompletionSettings, CreateEmbeddingsSettings}
 import io.cequence.openaiscala.domain.{ChatRole, MessageSpec}
 import io.cequence.openaiscala.service.OpenAIServiceFactory
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -56,7 +57,7 @@ private class OpenAICompletionProvider(
     }
   )
 
-  override def modelName: String = s"OpenAI: ${modelId}"
+  override def modelName: String = s"OpenAI: $modelId"
 }
 
 object OpenAICompletionProvider {

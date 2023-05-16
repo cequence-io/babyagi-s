@@ -12,13 +12,13 @@ private class PineconeVectorStoreProvider(
   pineconeVectorService: PineconeVectorService,
   namespace: String)(
   implicit ec: ExecutionContext
-) extends VectorStoreProvider {
+) extends VectorStoreProvider with PineconeHelper {
 
   override def add(
     id: String,
     vector: Seq[Double],
     metadata: Map[String, String]
-  ): Future[Unit] =
+  ): Future[Unit] = retryAux(
     pineconeVectorService.upsert(
       vectors = Seq(
         PVector(
@@ -30,12 +30,13 @@ private class PineconeVectorStoreProvider(
       ),
       namespace
     ).map(_ => ())
+  )
 
   override def querySorted(
     vector: Seq[Double],
     topResultsNum: Int,
     metadataFieldName: String
-  ): Future[Seq[String]] =
+  ): Future[Seq[String]] = retryAux(
     for {
       results <- pineconeVectorService.query(
         vector,
@@ -51,21 +52,21 @@ private class PineconeVectorStoreProvider(
 
       sortedResults.flatMap(_.metadata.map(_(metadataFieldName)))
     }
+  )
 }
 
-object PineconeVectorStoreProvider {
-
-  private val dimension = 1536
+object PineconeVectorStoreProvider extends PineconeHelper {
 
   def apply(
     indexName: String,
     namespace: String,
+    dimension: Int,
     config: Config)(
     implicit ec: ExecutionContext, materializer: Materializer
   ): Future[VectorStoreProvider] = {
     val pineconeIndexService = PineconeIndexServiceFactory(config)
 
-    createVectorServiceAux(pineconeIndexService, indexName, config).map {
+    createVectorServiceAux(pineconeIndexService, indexName, dimension, config).map {
       new PineconeVectorStoreProvider(_, namespace)
     }
   }
@@ -73,6 +74,7 @@ object PineconeVectorStoreProvider {
   private def createVectorServiceAux(
     pineconeIndexService: PineconeIndexService,
     indexName: String,
+    dimension: Int,
     config: Config)(
     implicit ec: ExecutionContext, materializer: Materializer
   ): Future[PineconeVectorService] =
@@ -80,28 +82,32 @@ object PineconeVectorStoreProvider {
       indexNames <- pineconeIndexService.listIndexes
 
       _ <- if (!indexNames.contains(indexName)) {
-        pineconeIndexService.createIndex(
-          indexName,
-          dimension,
-          settings = CreateIndexSettings(
-            metric = Metric.cosine,
-            pods = 1,
-            replicas = 1,
-            podType = PodType.p1_x1
+        retryAux(
+          pineconeIndexService.createIndex(
+            indexName,
+            dimension,
+            settings = CreateIndexSettings(
+              metric = Metric.cosine,
+              pods = 1,
+              replicas = 1,
+              podType = PodType.p1_x1
+            )
           )
         )
       } else {
         Future()
       }
 
-      vectorService <- PineconeVectorServiceFactory(
-        indexName,
-        config
-      ).map(_.getOrElse(
-        throw new Exception(s"Could not find index '${indexName}'")
-      ))
+      vectorService <- retryAux(
+        PineconeVectorServiceFactory(
+          indexName,
+          config
+        ).map(_.getOrElse(
+          throw new Exception(s"Could not find index '${indexName}'")
+        ))
+      )
 
-      indexStatsResponse <- vectorService.describeIndexStats
+      indexStatsResponse <- retryAux(vectorService.describeIndexStats)
     } yield {
       assert(dimension == indexStatsResponse.dimension, "Dimension of the index does not match the dimension of the LLM embedding")
 
