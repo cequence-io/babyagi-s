@@ -1,12 +1,17 @@
 package io.cequence.babyagis.next
 
+import akka.NotUsed
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.ws.{TextMessage, WebSocketRequest}
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.typesafe.config.ConfigFactory
-import io.cequence.babyagis.next.providers.{HumanCompletionProvider, ONNXEmbeddingsProvider, OpenAICompletionProvider, OpenAIEmbeddingsProvider, PineconeVectorStoreProvider}
+import io.cequence.babyagis.next.providers.{DummyVectorStoreProvider, HumanCompletionProvider, ONNXEmbeddingsProvider, OpenAICompletionProvider, OpenAIEmbeddingsProvider, PineconeVectorStoreProvider}
 import io.cequence.openaiscala.domain.ModelId
+import akka.http.scaladsl.model.ws.{Message => WsMessage}
 import io.cequence.pineconescala.service.PineconeIndexServiceFactory
+import akka.http.scaladsl.server.Directives._
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.DurationInt
@@ -14,7 +19,7 @@ import scala.concurrent.duration.DurationInt
 object BabyAGIExample extends App {
 
   private implicit val ec: ExecutionContext = ExecutionContext.global
-  private val actorSystem: ActorSystem = ActorSystem()
+  private implicit val actorSystem: ActorSystem = ActorSystem()
   private implicit val materializer: Materializer = Materializer(actorSystem)
 
   // using baby-agi-s-config.conf, which expects:
@@ -65,7 +70,7 @@ object BabyAGIExample extends App {
   } yield
     vectorStore
 
-  private val vectorStore = Await.result(vectorStoreFuture, 1.minutes)
+  private val vectorStore = Await.result(vectorStoreFuture, 1.minutes) // new DummyVectorStoreProvider()
 
   private val babyAGI = new BabyAGI(
     objective,
@@ -85,6 +90,25 @@ object BabyAGIExample extends App {
 
   // make it running
   eventQueue.via(flowProcess).to(Sink.ignore).run()
+
+  private val flowWsProcess: Flow[EventInfo, WsMessage, NotUsed] = Flow[EventInfo].map { event =>
+    event match {
+      case Message(text) => TextMessage.Strict(text)
+    }
+  }
+
+  val websocketRoute =
+    path("babyAGI") {
+      handleWebSocketMessages(
+        Flow.fromSinkAndSource(
+          Sink.foreach(println),
+          eventQueue.via(flowWsProcess))
+      )
+    }
+
+  Http().newServerAt("127.0.0.1", 8888)
+//    .adaptSettings(_.mapWebsocketSettings(_.withPeriodicKeepAliveData(() => ByteString(s"debug-${pingCounter.incrementAndGet()}"))))
+    .bind(websocketRoute)
 
   babyAGI.exec
 }
