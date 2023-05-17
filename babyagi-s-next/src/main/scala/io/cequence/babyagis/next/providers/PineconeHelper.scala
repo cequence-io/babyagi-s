@@ -12,7 +12,7 @@ trait PineconeHelper {
      implicit ec: ExecutionContext
   ) =
     retry(
-      failureMessage = "Pinecone API call error occurred.",
+      failureMessage = "Pinecone API call error occurred",
       log = println(_),
       maxAttemptNum = maxRetryAttempts,
       sleepOnFailureMs = sleepOnFailureSec * 1000

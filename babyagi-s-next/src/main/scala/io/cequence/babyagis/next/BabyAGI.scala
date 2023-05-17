@@ -1,5 +1,8 @@
 package io.cequence.babyagis.next
 
+import akka.NotUsed
+import akka.stream.{Materializer, OverflowStrategy}
+import akka.stream.scaladsl.Source
 import io.cequence.babyagis.next.providers.{CompletionProvider, EmbeddingsProvider, VectorStoreProvider}
 
 import scala.concurrent.duration.DurationInt
@@ -11,10 +14,13 @@ class BabyAGI(
   vectorStore: VectorStoreProvider,
   completionProvider: CompletionProvider,
   embeddingsProvider: EmbeddingsProvider)(
-  implicit ec: ExecutionContext
+  implicit ec: ExecutionContext, materializer: Materializer
 ) {
   // Initialize tasks storage
   private val tasks_storage = new SingleTaskListStorage()
+
+  private val eventQueueAux = Source.queue[EventInfo](bufferSize = 100, OverflowStrategy.backpressure)
+  private val (eventQueueMat, eventQueue) = eventQueueAux.preMaterialize()
 
   private val instanceName = "BabyAGI"
   private val mode = "local"
@@ -248,6 +254,7 @@ class BabyAGI(
         val task = tasks_storage.popleft
         println("\033[92m\033[1m" + "\n*****NEXT TASK*****\n" + "\033[0m\033[0m")
         println(task("task_name"))
+        eventQueueMat.offer(Message(s"Iteration ${iteration_id + 1} - current task: ${task("task_name")}"))
 
         val processFuture = for {
           // Send to execution function to complete the task based on the context
@@ -256,6 +263,7 @@ class BabyAGI(
           _ = {
             println("\033[93m\033[1m" + "\n*****TASK RESULT*****\n" + "\033[0m\033[0m")
             println(result)
+            eventQueueMat.offer(Message(s"Iteration ${iteration_id + 1} - task result: ${result}"))
           }
 
           // Step 2: Enrich result and store in the results storage
@@ -315,4 +323,6 @@ class BabyAGI(
       }
     }
   }
+
+  def getEventQueue: Source[EventInfo, NotUsed] = eventQueue
 }

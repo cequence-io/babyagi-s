@@ -12,7 +12,7 @@ trait OpenAIHelper {
     implicit ec: ExecutionContext
   ) =
     retryOnOpenAIException(
-      failureMessage = "OpenAI API error occurred.",
+      failureMessage = "OpenAI API error occurred",
       log = println(_),
       maxAttemptNum = maxRetryAttempts,
       sleepOnFailureMs = sleepOnFailureSec * 1000

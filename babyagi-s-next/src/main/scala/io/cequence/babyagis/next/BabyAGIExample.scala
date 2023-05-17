@@ -2,6 +2,7 @@ package io.cequence.babyagis.next
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
+import akka.stream.scaladsl.{Flow, Sink}
 import com.typesafe.config.ConfigFactory
 import io.cequence.babyagis.next.providers.{HumanCompletionProvider, ONNXEmbeddingsProvider, OpenAICompletionProvider, OpenAIEmbeddingsProvider, PineconeVectorStoreProvider}
 import io.cequence.openaiscala.domain.ModelId
@@ -73,6 +74,17 @@ object BabyAGIExample extends App {
     completionProvider,
     embeddingsProvider
   )
+
+  val eventQueue = babyAGI.getEventQueue
+
+  private val flowProcess = Flow[EventInfo].map { event =>
+    event match {
+      case Message(text) => println("MESSAGE RECEIVED: " + text)
+    }
+  }
+
+  // make it running
+  eventQueue.via(flowProcess).to(Sink.ignore).run()
 
   babyAGI.exec
 }
