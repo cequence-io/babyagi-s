@@ -1,0 +1,34 @@
+<!DOCTYPE HTML>
+
+<html>
+    <head>
+        <script type = "text/javascript">
+            if ("WebSocket" in window) {
+                alert("WebSocket is supported by your Browser!");
+               
+                // Let us open a web socket
+                var ws = new WebSocket("ws://localhost:8888/babyAGI");
+
+                ws.onmessage = function (evt) {
+                    var received_msg = evt.data;
+                    const div = document.getElementById("outputDiv");
+                    div.innerHTML += '<p>Message is received: ' + received_msg + '</p>';
+                };
+				
+                ws.onclose = function() { 
+                   // websocket is closed.
+                   const div = document.getElementById("outputDiv");
+                   div.innerHTML += "Connection is closed...";
+                };
+            } else {  
+               // The browser doesn't support WebSocket
+               alert("WebSocket NOT supported by your Browser!");
+            }
+        </script>
+    </head>
+   
+    <body>
+        <div id="outputDiv">
+        </div>
+   </body>
+</html>
