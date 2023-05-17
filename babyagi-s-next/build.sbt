@@ -13,6 +13,8 @@ libraryDependencies ++= Seq(
   "com.microsoft.onnxruntime" % "onnxruntime" % "1.14.0",
   "ai.djl.huggingface" % "tokenizers" % "0.21.0",
 
+  "com.typesafe.akka" %% "akka-http" % "10.2.10",
+
   "org.scalatest" %% "scalatest" % "3.2.15" % "test",
   "ch.qos.logback" % "logback-classic" % "1.4.7" % Runtime
 )
