@@ -7,12 +7,14 @@ val scala3 = "3.2.2"
 
 ThisBuild / organization := "io.cequence"
 ThisBuild / scalaVersion := scala212
-ThisBuild / version := "0.1.0"
+ThisBuild / version := "0.1.1"
 ThisBuild / isSnapshot := false
 
 lazy val port = (project in file("babyagi-s-port"))
 
 lazy val next = (project in file("babyagi-s-next"))
+
+lazy val azure_form = (project in file("azure-form"))
 
 // POM settings for Sonatype
 ThisBuild / homepage := Some(url("https://github.com/cequence-io/babyagi-s"))
