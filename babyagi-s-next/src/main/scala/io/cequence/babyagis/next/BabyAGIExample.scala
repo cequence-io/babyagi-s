@@ -34,8 +34,8 @@ object BabyAGIExample extends App {
   //////////////
   private val objective = "Save the planet Earth from the evil aliens"
   private val initialTask = "Develop a task list"
-  private val pineconeIndexName = "baby-agi-test-table"
-  private val pineconeNamespace = "xxx yyy zzz"
+  private val pineconeIndexName = "openai-embeddings-1536"
+  private val pineconeNamespace = "baby-agi-test"
   //////////////
 
   // Completion provider
