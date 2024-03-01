@@ -40,6 +40,7 @@ case class Line(
 
 case class Page(
   pageNumber: Int,
+  // Orientation of content in clockwise direction (degree)
   angle: Double,
   width: Double,
   height: Double,
