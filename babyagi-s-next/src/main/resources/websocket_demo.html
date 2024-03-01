@@ -4,15 +4,13 @@
     <head>
         <script type = "text/javascript">
             if ("WebSocket" in window) {
-                alert("WebSocket is supported by your Browser!");
-               
                 // Let us open a web socket
-                var ws = new WebSocket("ws://localhost:8888/babyAGI");
+                const ws = new WebSocket("ws://localhost:8888/babyAGI");
 
                 ws.onmessage = function (evt) {
                     var received_msg = evt.data;
                     const div = document.getElementById("outputDiv");
-                    div.innerHTML += '<p>Message is received: ' + received_msg + '</p>';
+                    div.innerHTML += '<p><i>' + received_msg.replaceAll("\n", "<br>") + '</i></p>';
                 };
 				
                 ws.onclose = function() { 
@@ -28,7 +26,14 @@
     </head>
    
     <body>
-        <div id="outputDiv">
+        <div style="padding-left: 20px">
+            <h3>Baby AGI Demo</h3>
+            <hr>
+        </div>
+        <div style="padding-left: 20px">
+            <b>OBJECTIVE: Save the planet Earth from the evil aliens</b>
+        </div>
+        <div id="outputDiv" style="padding-left: 20px">
         </div>
    </body>
 </html>

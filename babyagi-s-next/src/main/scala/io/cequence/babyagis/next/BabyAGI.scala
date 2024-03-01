@@ -229,6 +229,7 @@ class BabyAGI(
 
     println("\033[94m\033[1m" + "\n*****OBJECTIVE*****\n" + "\033[0m\033[0m")
     println(objective)
+    eventQueueMat.offer(Message(s"Starting the Baby AGI bot with the objective: '${objective}'"))
 
     println(s"\033[93m\033[1m" + "\nInitial task:" + "\033[0m\033[0m" + f" ${initialTask}")
 
@@ -254,7 +255,7 @@ class BabyAGI(
         val task = tasks_storage.popleft
         println("\033[92m\033[1m" + "\n*****NEXT TASK*****\n" + "\033[0m\033[0m")
         println(task("task_name"))
-        eventQueueMat.offer(Message(s"Iteration ${iteration_id + 1} - current task: ${task("task_name")}"))
+        eventQueueMat.offer(Message(s"Iteration ${iteration_id + 1} - current task:\n${task("task_name")}"))
 
         val processFuture = for {
           // Send to execution function to complete the task based on the context
@@ -263,7 +264,7 @@ class BabyAGI(
           _ = {
             println("\033[93m\033[1m" + "\n*****TASK RESULT*****\n" + "\033[0m\033[0m")
             println(result)
-            eventQueueMat.offer(Message(s"Iteration ${iteration_id + 1} - task result: ${result}"))
+            eventQueueMat.offer(Message(s"Iteration ${iteration_id + 1} - task result:\n${result}"))
           }
 
           // Step 2: Enrich result and store in the results storage
