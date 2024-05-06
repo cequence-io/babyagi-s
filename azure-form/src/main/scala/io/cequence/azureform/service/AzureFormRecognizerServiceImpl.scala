@@ -5,7 +5,12 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import io.cequence.azureform.AzureFormats._
-import io.cequence.azureform.model.{AzureInvoiceResponse, AzureLayoutResponse, AzureReadResponse, HasStatus}
+import io.cequence.azureform.model.{
+  AzureInvoiceResponse,
+  AzureLayoutResponse,
+  AzureReadResponse,
+  HasStatus
+}
 import play.api.libs.json.JsObject
 import play.api.libs.ws.StandaloneWSRequest
 import io.cequence.azureform.JsonUtil.JsonOps
@@ -319,7 +324,7 @@ private class AzureFormRecognizerServiceImpl(
     request: StandaloneWSRequest,
     exec: StandaloneWSRequest => Future[StandaloneWSRequest#Response]
   ): Future[Map[String, Seq[String]]] =
-    exec(request).map(_.headers)
+    exec(request).map(_.headers.map(h => h._1 -> h._2.toSeq))
 
   override protected def createUrl(
     endpoint: Option[PEP],
