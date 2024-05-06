@@ -2,7 +2,7 @@ package io.cequence.babyagis.next.providers
 
 import akka.stream.Materializer
 import com.typesafe.config.Config
-import io.cequence.pineconescala.domain.settings.{CreateIndexSettings, QuerySettings}
+import io.cequence.pineconescala.domain.settings.{CreatePodBasedIndexSettings, QuerySettings}
 import io.cequence.pineconescala.domain.{Metric, PVector, PodType}
 import io.cequence.pineconescala.service.{PineconeIndexService, PineconeIndexServiceFactory, PineconeVectorService, PineconeVectorServiceFactory}
 
@@ -86,7 +86,7 @@ object PineconeVectorStoreProvider extends PineconeHelper {
           pineconeIndexService.createIndex(
             indexName,
             dimension,
-            settings = CreateIndexSettings(
+            settings = CreatePodBasedIndexSettings(
               metric = Metric.cosine,
               pods = 1,
               replicas = 1,

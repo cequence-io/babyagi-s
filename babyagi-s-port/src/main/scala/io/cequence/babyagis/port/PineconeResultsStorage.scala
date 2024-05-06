@@ -5,7 +5,7 @@ import io.cequence.openaiscala.domain.ModelId
 import io.cequence.openaiscala.domain.settings.CreateEmbeddingsSettings
 import io.cequence.openaiscala.service.OpenAIService
 import io.cequence.pineconescala.service.{PineconeIndexServiceFactory, PineconeVectorService, PineconeVectorServiceFactory}
-import io.cequence.pineconescala.domain.settings.{CreateIndexSettings, QuerySettings}
+import io.cequence.pineconescala.domain.settings.{CreatePodBasedIndexSettings, QuerySettings}
 import io.cequence.pineconescala.domain.{Metric, PVector, PodType}
 
 import scala.concurrent.duration.DurationInt
@@ -19,7 +19,7 @@ class PineconeResultsStorage(
   objective: String)(
   implicit ec: ExecutionContext, materializer: Materializer
 ) {
-  private val pineconeIndexService = PineconeIndexServiceFactory(pinecone_api_key, pinecone_environment)
+  private val pineconeIndexService = PineconeIndexServiceFactory(pinecone_api_key, Some(pinecone_environment))
 
   // Pinecone namespaces are only compatible with ascii characters (used in query and upsert)
   private val namespace = objective.replaceAll("[^\\x00-\\x7F]+", "")
@@ -36,7 +36,7 @@ class PineconeResultsStorage(
         pineconeIndexService.createIndex(
           results_store_name,
           dimension,
-          settings = CreateIndexSettings(
+          settings = CreatePodBasedIndexSettings(
             metric = Metric.cosine,
             pods = 1,
             replicas = 1,

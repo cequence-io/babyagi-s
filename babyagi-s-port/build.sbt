@@ -4,8 +4,8 @@ name := "babyagi-s-port"
 
 description := "One-to-one port of Baby AGI in Scala"
 
-val openAIScalaVersion = "0.3.2"
-val pineconeScalaVersion = "0.1.0"
+val openAIScalaVersion = "1.0.0"
+val pineconeScalaVersion = "0.1.2"
 
 libraryDependencies ++= Seq(
   "io.cequence" %% "pinecone-scala-client" % pineconeScalaVersion,
