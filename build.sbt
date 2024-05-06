@@ -14,7 +14,11 @@ lazy val port = (project in file("babyagi-s-port"))
 
 lazy val next = (project in file("babyagi-s-next"))
 
+lazy val azure_form_domain = (project in file("azure-form-domain"))
+
 lazy val azure_form = (project in file("azure-form"))
+  .aggregate(azure_form_domain)
+  .dependsOn(azure_form_domain)
 
 // POM settings for Sonatype
 ThisBuild / homepage := Some(url("https://github.com/cequence-io/babyagi-s"))

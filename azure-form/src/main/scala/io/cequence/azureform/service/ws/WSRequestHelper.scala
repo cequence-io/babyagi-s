@@ -3,7 +3,7 @@ package io.cequence.azureform.service.ws
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonMappingException
 import io.cequence.azureform._
-import io.cequence.azureform.service.JsonUtil.toJson
+import io.cequence.azureform.JsonUtil.toJson
 import play.api.libs.json.{JsObject, JsValue}
 import play.api.libs.ws.{BodyWritable, StandaloneWSRequest}
 import play.api.libs.ws.JsonBodyWritables._

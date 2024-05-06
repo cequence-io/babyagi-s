@@ -4,11 +4,11 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import io.cequence.azureform.AzureFormats._
 import io.cequence.azureform.model.{AzureInvoiceResponse, AzureLayoutResponse, AzureReadResponse, HasStatus}
-import io.cequence.azureform.service.JsonUtil.JsonOps
-import play.api.libs.json.{JsArray, JsNull, JsObject, Json}
-import play.api.libs.ws.{BodyWritable, StandaloneWSRequest}
-import io.cequence.azureform.service.AzureFormats._
+import play.api.libs.json.JsObject
+import play.api.libs.ws.StandaloneWSRequest
+import io.cequence.azureform.JsonUtil.JsonOps
 import io.cequence.azureform.service.ws.{Timeouts, WSRequestHelper}
 import org.slf4j.LoggerFactory
 import play.api.libs.ws.DefaultBodyWritables
