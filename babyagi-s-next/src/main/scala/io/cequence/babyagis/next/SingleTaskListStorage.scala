@@ -6,7 +6,7 @@ import scala.collection.mutable.{Buffer => MutableBuffer}
 class SingleTaskListStorage {
   type Dict = Map[String, Any]
 
-  var tasks: MutableBuffer[Dict] = MutableBuffer()  // TODO: deque?
+  var tasks: MutableBuffer[Dict] = MutableBuffer() // TODO: deque?
 
   var task_id_counter: Int = 0
 
@@ -29,5 +29,5 @@ class SingleTaskListStorage {
   }
 
   def get_task_names: Seq[String] =
-    tasks.map(t => t("task_name").toString)
+    tasks.map(t => t("task_name").toString).toSeq
 }

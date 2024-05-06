@@ -31,7 +31,7 @@ object BabyAGI {
 
   val openAIService = if (!(LLM_MODEL.startsWith("llama") || LLM_MODEL.startsWith("human")) || OPENAI_API_KEY.isDefined) {
     val OPENAI_API_ORG_ID = envPropOrNone("OPENAI_API_ORG_ID")
-    assert(OPENAI_API_KEY.isDefined, "\033[91m\033[1m" + "OPENAI_API_KEY environment variable is missing" + "\033[0m\033[0m")
+    assert(OPENAI_API_KEY.isDefined, "\u001b[91m\u001b[1m" + "OPENAI_API_KEY environment variable is missing" + "\u001b[0m\u001b[0m")
 
     Some(OpenAIServiceFactory(OPENAI_API_KEY.get, OPENAI_API_ORG_ID))
   } else {
@@ -40,7 +40,7 @@ object BabyAGI {
 
   // Table config
   val RESULTS_STORE_NAME = envPropOrSome("RESULTS_STORE_NAME", envPropOrNone("TABLE_NAME"))
-  assert(RESULTS_STORE_NAME.isDefined, "\033[91m\033[1m" + "RESULTS_STORE_NAME environment variable is missing" + "\033[0m\033[0m")
+  assert(RESULTS_STORE_NAME.isDefined, "\u001b[91m\u001b[1m" + "RESULTS_STORE_NAME environment variable is missing" + "\u001b[0m\u001b[0m")
 
   // Run configuration
   val INSTANCE_NAME = envPropOrElse("INSTANCE_NAME", envPropOrElse("BABY_NAME", "BabyAGI"))
@@ -61,49 +61,49 @@ object BabyAGI {
   else if (Set("d", "distributed").contains(COOPERATIVE_MODE)) "distributed"
   else "undefined"
 
-  println("\033[95m\033[1m" + "\n*****CONFIGURATION*****\n" + "\033[0m\033[0m")
+  println("\u001b[95m\u001b[1m" + "\n*****CONFIGURATION*****\n" + "\u001b[0m\u001b[0m")
   println(s"Name  : ${INSTANCE_NAME}")
   println(s"Mode  : ${MODE}")
   println(s"LLM   : ${LLM_MODEL}")
 
   // Check if we know what we are doing
-  assert(OBJECTIVE.nonEmpty, "\033[91m\033[1m" + "OBJECTIVE environment variable is missing from .env" + "\033[0m\033[0m")
-  assert(INITIAL_TASK.nonEmpty, "\033[91m\033[1m" + "INITIAL_TASK environment variable is missing from .env" + "\033[0m\033[0m")
+  assert(OBJECTIVE.nonEmpty, "\u001b[91m\u001b[1m" + "OBJECTIVE environment variable is missing from .env" + "\u001b[0m\u001b[0m")
+  assert(INITIAL_TASK.nonEmpty, "\u001b[91m\u001b[1m" + "INITIAL_TASK environment variable is missing from .env" + "\u001b[0m\u001b[0m")
 
   if (LLM_MODEL.startsWith("llama"))
     throw new IllegalArgumentException("Llama not supported yet")
 
   if (LLM_MODEL.startsWith("gpt-4"))
     println(
-      "\033[91m\033[1m"
+      "\u001b[91m\u001b[1m"
         + "\n*****USING GPT-4. POTENTIALLY EXPENSIVE. MONITOR YOUR COSTS*****"
-        + "\033[0m\033[0m"
+        + "\u001b[0m\u001b[0m"
     )
 
   if (LLM_MODEL.startsWith("human"))
     println(
-      "\033[91m\033[1m"
+      "\u001b[91m\u001b[1m"
         + "\n*****USING HUMAN INPUT*****"
-        + "\033[0m\033[0m"
+        + "\u001b[0m\u001b[0m"
     )
 
 
-  println("\033[94m\033[1m" + "\n*****OBJECTIVE*****\n" + "\033[0m\033[0m")
+  println("\u001b[94m\u001b[1m" + "\n*****OBJECTIVE*****\n" + "\u001b[0m\u001b[0m")
   println(OBJECTIVE)
 
   if (!JOIN_EXISTING_OBJECTIVE)
-    println(s"\033[93m\033[1m" + "\nInitial task:" + "\033[0m\033[0m" + f" ${INITIAL_TASK}")
+    println(s"\u001b[93m\u001b[1m" + "\nInitial task:" + "\u001b[0m\u001b[0m" + f" ${INITIAL_TASK}")
   else
-    println("\033[93m\033[1m" + f"\nJoining to help the objective" + "\033[0m\033[0m")
+    println("\u001b[93m\u001b[1m" + f"\nJoining to help the objective" + "\u001b[0m\u001b[0m")
 
   // Initialize results storage
   val PINECONE_API_KEY = envPropOrElse("PINECONE_API_KEY", "")
 
   lazy val results_storage = if (PINECONE_API_KEY.nonEmpty) {
     val PINECONE_ENVIRONMENT = envPropOrElse("PINECONE_ENVIRONMENT", "")
-    assert(PINECONE_ENVIRONMENT.nonEmpty, "\033[91m\033[1m" + "PINECONE_ENVIRONMENT environment variable is missing" + "\033[0m\033[0m")
+    assert(PINECONE_ENVIRONMENT.nonEmpty, "\u001b[91m\u001b[1m" + "PINECONE_ENVIRONMENT environment variable is missing" + "\u001b[0m\u001b[0m")
 
-    println("\nReplacing results storage: " + "\033[93m\033[1m" + "Pinecone" + "\033[0m\033[0m")
+    println("\nReplacing results storage: " + "\u001b[93m\u001b[1m" + "Pinecone" + "\u001b[0m\u001b[0m")
 
     new PineconeResultsStorage(
       PINECONE_API_KEY,
@@ -381,10 +381,10 @@ object BabyAGI {
     }
 
   def user_input_await(prompt: String): String = {
-    println("\033[94m\033[1m" + "\n> COPY FOLLOWING TEXT TO CHATBOT\n" + "\033[0m\033[0m")
+    println("\u001b[94m\u001b[1m" + "\n> COPY FOLLOWING TEXT TO CHATBOT\n" + "\u001b[0m\u001b[0m")
     println(prompt)
-    println("\033[91m\033[1m" + "\n AFTER PASTING, PRESS: (ENTER / EMPTY LINE) TO FINISH\n" + "\033[0m\033[0m")
-    println("\033[96m\033[1m" + "\n> PASTE YOUR RESPONSE:\n" + "\033[0m\033[0m")
+    println("\u001b[91m\u001b[1m" + "\n AFTER PASTING, PRESS: (ENTER / EMPTY LINE) TO FINISH\n" + "\u001b[0m\u001b[0m")
+    println("\u001b[96m\u001b[1m" + "\n> PASTE YOUR RESPONSE:\n" + "\u001b[0m\u001b[0m")
 
     val input_text = Stream.continually(scala.io.StdIn.readLine()).takeWhile(_.strip != "")
     input_text.mkString("\n").strip
@@ -409,14 +409,14 @@ object BabyAGI {
       // As long as there are tasks in the storage...
       if (!tasks_storage.is_empty) {
         // Print the task list
-        println("\033[95m\033[1m" + "\n*****TASK LIST*****\n" + "\033[0m\033[0m")
+        println("\u001b[95m\u001b[1m" + "\n*****TASK LIST*****\n" + "\u001b[0m\u001b[0m")
         for (t <- tasks_storage.get_task_names) {
           println(" • " + t)
         }
 
         // Step 1: Pull the first incomplete task
         val task = tasks_storage.popleft
-        println("\033[92m\033[1m" + "\n*****NEXT TASK*****\n" + "\033[0m\033[0m")
+        println("\u001b[92m\u001b[1m" + "\n*****NEXT TASK*****\n" + "\u001b[0m\u001b[0m")
         println(task("task_name"))
 
         val processFuture = for {
@@ -424,7 +424,7 @@ object BabyAGI {
           result <- execution_agent(OBJECTIVE, task("task_name").toString)
 
           _ = {
-            println("\033[93m\033[1m" + "\n*****TASK RESULT*****\n" + "\033[0m\033[0m")
+            println("\u001b[93m\u001b[1m" + "\n*****TASK RESULT*****\n" + "\u001b[0m\u001b[0m")
             println(result)
           }
 
@@ -469,7 +469,7 @@ object BabyAGI {
         } yield
           ()
 
-        Await.result(processFuture, 10 minutes)
+        Await.result(processFuture, 10.minutes)
 
         // Sleep a bit before checking the task list again
         Thread.sleep(5000)

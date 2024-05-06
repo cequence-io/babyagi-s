@@ -28,5 +28,5 @@ class SingleTaskListStorage {
   }
 
   def get_task_names: Seq[String] =
-    tasks.map(t => t("task_name").toString)
+    tasks.map(t => t("task_name").toString).toSeq
 }

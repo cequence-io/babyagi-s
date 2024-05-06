@@ -24,7 +24,7 @@ class PineconeResultsStorage(
   // Pinecone namespaces are only compatible with ascii characters (used in query and upsert)
   private val namespace = objective.replaceAll("[^\\x00-\\x7F]+", "")
 
-  private val pineconeVectorService: PineconeVectorService = Await.result(init, 2 minutes)
+  private val pineconeVectorService: PineconeVectorService = Await.result(init, 2.minutes)
 
   def init = {
     val dimension = if (!llm_model.startsWith("llama")) 1536 else 5120

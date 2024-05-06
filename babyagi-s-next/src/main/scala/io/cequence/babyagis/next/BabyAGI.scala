@@ -206,7 +206,7 @@ class BabyAGI(
   }
 
   def exec = {
-    println("\033[95m\033[1m" + "\n*****CONFIGURATION*****\n" + "\033[0m\033[0m")
+    println("\u001b[95m\u001b[1m" + "\n*****CONFIGURATION*****\n" + "\u001b[0m\u001b[0m")
     println(s"Name             : ${instanceName}")
     println(s"Mode             : ${mode}")
     println(s"Completion Model : ${completionProvider.modelName}")
@@ -214,24 +214,24 @@ class BabyAGI(
 
     if (completionProvider.modelName.startsWith("OpenAI: gpt-4"))
       println(
-        "\033[91m\033[1m"
+        "\u001b[91m\u001b[1m"
           + "\n*****USING GPT-4. POTENTIALLY EXPENSIVE. MONITOR YOUR COSTS*****"
-          + "\033[0m\033[0m"
+          + "\u001b[0m\u001b[0m"
       )
 
     if (completionProvider.modelName.startsWith("human"))
       println(
-        "\033[91m\033[1m"
+        "\u001b[91m\u001b[1m"
           + "\n*****USING HUMAN INPUT*****"
-          + "\033[0m\033[0m"
+          + "\u001b[0m\u001b[0m"
       )
 
 
-    println("\033[94m\033[1m" + "\n*****OBJECTIVE*****\n" + "\033[0m\033[0m")
+    println("\u001b[94m\u001b[1m" + "\n*****OBJECTIVE*****\n" + "\u001b[0m\u001b[0m")
     println(objective)
     eventQueueMat.offer(Message(s"Starting the Baby AGI bot with the objective: '${objective}'"))
 
-    println(s"\033[93m\033[1m" + "\nInitial task:" + "\033[0m\033[0m" + f" ${initialTask}")
+    println(s"\u001b[93m\u001b[1m" + "\nInitial task:" + "\u001b[0m\u001b[0m" + f" ${initialTask}")
 
     val initial_task = Map(
       "task_id" -> tasks_storage.next_task_id.toString,
@@ -246,14 +246,14 @@ class BabyAGI(
       // As long as there are tasks in the storage...
       if (!tasks_storage.is_empty) {
         // Print the task list
-        println("\033[95m\033[1m" + "\n*****TASK LIST*****\n" + "\033[0m\033[0m")
+        println("\u001b[95m\u001b[1m" + "\n*****TASK LIST*****\n" + "\u001b[0m\u001b[0m")
         for (t <- tasks_storage.get_task_names) {
           println(" • " + t)
         }
 
         // Step 1: Pull the first incomplete task
         val task = tasks_storage.popleft
-        println("\033[92m\033[1m" + "\n*****NEXT TASK*****\n" + "\033[0m\033[0m")
+        println("\u001b[92m\u001b[1m" + "\n*****NEXT TASK*****\n" + "\u001b[0m\u001b[0m")
         println(task("task_name"))
         eventQueueMat.offer(Message(s"Iteration ${iteration_id + 1} - current task:\n${task("task_name")}"))
 
@@ -262,7 +262,7 @@ class BabyAGI(
           result <- executionAgent(objective, task("task_name").toString)
 
           _ = {
-            println("\033[93m\033[1m" + "\n*****TASK RESULT*****\n" + "\033[0m\033[0m")
+            println("\u001b[93m\u001b[1m" + "\n*****TASK RESULT*****\n" + "\u001b[0m\u001b[0m")
             println(result)
             eventQueueMat.offer(Message(s"Iteration ${iteration_id + 1} - task result:\n${result}"))
           }
@@ -314,7 +314,7 @@ class BabyAGI(
         } yield
           ()
 
-        Await.result(processFuture, 10 minutes)
+        Await.result(processFuture, 10.minutes)
 
         // Sleep a bit before checking the task list again
         Thread.sleep(5000)
