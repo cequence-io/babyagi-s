@@ -1,6 +1,6 @@
 package io.cequence.azureform.service
 
-import io.cequence.azureform.service.ws.EnumValue
+import io.cequence.wsclient.service.ws.EnumValue
 
 sealed abstract class AzureFormRecognizerEndPoint(value: String = "") extends EnumValue(value)
 

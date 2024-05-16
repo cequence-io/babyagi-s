@@ -14,7 +14,7 @@ import io.cequence.azureform.model.{
 import play.api.libs.json.JsObject
 import play.api.libs.ws.StandaloneWSRequest
 import io.cequence.azureform.JsonUtil.JsonOps
-import io.cequence.azureform.service.ws.{Timeouts, WSRequestHelper}
+import io.cequence.wsclient.service.ws.{Timeouts, WSRequestHelper}
 import org.slf4j.LoggerFactory
 import play.api.libs.ws.DefaultBodyWritables
 
