@@ -52,7 +52,7 @@ private class AzureFormRecognizerServiceImpl(
       endPoint = Some(AzureFormRecognizerEndPoint.analyze),
       endPointParam = Some(modelId),
       params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
+        AzureFormRecognizerParam.api_version.toString() -> Some(apiVersion)
       )
     )
 
@@ -88,7 +88,7 @@ private class AzureFormRecognizerServiceImpl(
       endPoint = Some(AzureFormRecognizerEndPoint.analyze),
       endPointParam = Some(modelId),
       params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
+        AzureFormRecognizerParam.api_version.toString() -> Some(apiVersion)
       )
     )
 
@@ -114,7 +114,7 @@ private class AzureFormRecognizerServiceImpl(
       endPoint = Some(AzureFormRecognizerEndPoint.analyze),
       endPointParam = Some(modelId),
       params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
+        AzureFormRecognizerParam.api_version.toString() -> Some(apiVersion)
       )
     )
 
@@ -349,14 +349,14 @@ private class AzureFormRecognizerServiceImpl(
   override protected def getWSRequestOptional(
     endPoint: Option[PEP],
     endPointParam: Option[String],
-    params: Seq[(PT, Option[Any])] = Nil
+    params: Seq[(String, Option[Any])] = Nil
   ): StandaloneWSRequest#Self =
     super.getWSRequestOptional(endPoint, endPointParam, params).addHttpHeaders(authHeader)
 
   override protected def getWSRequest(
     endPoint: Option[PEP],
     endPointParam: Option[String],
-    params: Seq[(PT, Any)] = Nil
+    params: Seq[(String, Any)] = Nil
   ): StandaloneWSRequest#Self =
     super.getWSRequest(endPoint, endPointParam, params).addHttpHeaders(authHeader)
 }
