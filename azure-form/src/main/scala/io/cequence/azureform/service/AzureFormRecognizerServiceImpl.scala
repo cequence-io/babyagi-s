@@ -46,13 +46,15 @@ private class AzureFormRecognizerServiceImpl(
   override def analyzeRemote(
     urlSource: String,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[String] = {
     val request = getWSRequestOptional(
       endPoint = Some(AzureFormRecognizerEndPoint.analyze),
       endPointParam = Some(modelId),
       params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
+        AzureFormRecognizerParam.api_version -> Some(apiVersion),
+        AzureFormRecognizerParam.pages -> pages
       )
     )
 
@@ -69,67 +71,58 @@ private class AzureFormRecognizerServiceImpl(
     execRequestHeadersAux(
       request,
       _.post(JsObject(bodyParamsX))
-    ).map(
-      _.get("operation-location")
-        .flatMap(
-          _.headOption
-            .map(url => url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("?")))
-        )
-        .getOrElse(throw new Exception("Operation-Location header not found"))
-    )
+    ).map(getOperationLocation)
   }
 
   override def analyze(
     file: File,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ) = {
     val request = getWSRequestOptional(
       endPoint = Some(AzureFormRecognizerEndPoint.analyze),
       endPointParam = Some(modelId),
       params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
+        AzureFormRecognizerParam.api_version -> Some(apiVersion),
+        AzureFormRecognizerParam.pages -> pages
       )
     )
 
     execRequestHeadersAux(
       request,
       _.post(file)(writableOf_File)
-    ).map(
-      _.get("operation-location")
-        .flatMap(
-          _.headOption
-            .map(url => url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("?")))
-        )
-        .getOrElse(throw new Exception("Operation-Location header not found"))
-    )
+    ).map(getOperationLocation)
   }
 
   override def analyzeSource(
     source: Source[ByteString, _],
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[String] = {
     val request = getWSRequestOptional(
       endPoint = Some(AzureFormRecognizerEndPoint.analyze),
       endPointParam = Some(modelId),
       params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
+        AzureFormRecognizerParam.api_version -> Some(apiVersion),
+        AzureFormRecognizerParam.pages -> pages
       )
     )
 
     execRequestHeadersAux(
       request,
       _.post(source)(writableOf_Source)
-    ).map(
-      _.get("operation-location")
-        .flatMap(
-          _.headOption
-            .map(url => url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("?")))
-        )
-        .getOrElse(throw new Exception("Operation-Location header not found"))
-    )
+    ).map(getOperationLocation)
   }
+
+  private def getOperationLocation(headers: Map[String, Seq[String]]) =
+    headers.get("operation-location").orElse(headers.get("Operation-Location"))
+      .flatMap(
+        _.headOption
+          .map(url => url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("?")))
+      )
+      .getOrElse(throw new Exception(s"Operation-Location header not found in ${headers.mkString(", ")}"))
 
   def analyzeReadResults(
     resultsId: String,
@@ -179,6 +172,7 @@ private class AzureFormRecognizerServiceImpl(
   override def analyzeRead(
     file: File,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
@@ -187,12 +181,14 @@ private class AzureFormRecognizerServiceImpl(
     )(
       file,
       modelId,
+      pages,
       apiVersion
     )
 
   override def analyzeLayout(
     file: File,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
@@ -201,12 +197,14 @@ private class AzureFormRecognizerServiceImpl(
     )(
       file,
       modelId,
+      pages,
       apiVersion
     )
 
   override def analyzeInvoice(
     file: File,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
@@ -215,12 +213,14 @@ private class AzureFormRecognizerServiceImpl(
     )(
       file,
       modelId,
+      pages,
       apiVersion
     )
 
   override def analyzeReadSource(
     source: Source[ByteString, _],
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
@@ -229,12 +229,14 @@ private class AzureFormRecognizerServiceImpl(
     )(
       source,
       modelId,
+      pages,
       apiVersion
     )
 
   override def analyzeLayoutSource(
     source: Source[ByteString, _],
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
@@ -243,12 +245,14 @@ private class AzureFormRecognizerServiceImpl(
     )(
       source,
       modelId,
+      pages,
       apiVersion
     )
 
   override def analyzeInvoiceSource(
     source: Source[ByteString, _],
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
@@ -257,12 +261,14 @@ private class AzureFormRecognizerServiceImpl(
     )(
       source,
       modelId,
+      pages,
       apiVersion
     )
 
   override def analyzeReadRemote(
     urlSource: String,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
@@ -271,12 +277,14 @@ private class AzureFormRecognizerServiceImpl(
     )(
       urlSource,
       modelId,
+      pages,
       apiVersion
     )
 
   override def analyzeLayoutRemote(
     urlSource: String,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
@@ -285,12 +293,14 @@ private class AzureFormRecognizerServiceImpl(
     )(
       urlSource,
       modelId,
+      pages,
       apiVersion
     )
 
   override def analyzeInvoiceRemote(
     urlSource: String,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
@@ -299,21 +309,23 @@ private class AzureFormRecognizerServiceImpl(
     )(
       urlSource,
       modelId,
+      pages,
       apiVersion
     )
 
   // aux/helper functions
 
   protected def analyzeWithResultsAux[T <: HasStatus, IN](
-    analyzeFun: (IN, String, String) => Future[String],
+    analyzeFun: (IN, String, Option[String], String) => Future[String],
     analyzeResultsFun: (String, String, String) => Future[T]
   )(
     input: IN,
     modelId: String,
+    pages: Option[String],
     apiVersion: String
   ): Future[T] =
     for {
-      resultId <- analyzeFun(input, modelId, apiVersion)
+      resultId <- analyzeFun(input, modelId, pages, apiVersion)
 
       result <- pollUntilDone(
         analyzeResultsFun(resultId, modelId, apiVersion)
