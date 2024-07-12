@@ -15,6 +15,7 @@ case class LayoutAnalyzeResult(
   pages: List[LayoutPage], // page with selection marks
   paragraphs: List[Paragraph],
   tables: List[Table] // extra: compared to ReadAnalyzeResult
+  // TODO: add styles
 )
 
 case class LayoutPage(

@@ -19,4 +19,5 @@ object AzureFormRecognizerParam {
   case object urlSource extends AzureFormRecognizerParam
   case object source extends AzureFormRecognizerParam
   case object base64Source extends AzureFormRecognizerParam
+  case object pages extends AzureFormRecognizerParam
 }

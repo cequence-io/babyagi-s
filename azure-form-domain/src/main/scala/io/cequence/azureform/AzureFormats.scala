@@ -3,7 +3,9 @@ package io.cequence.azureform
 import ai.x.play.json.Encoders.encoder
 import ai.x.play.json.Jsonx
 import io.cequence.azureform.model._
-import play.api.libs.json.Json
+import play.api.libs.json.{Format, Json, Reads, Writes}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
 object AzureFormats {
   implicit val spanFormat = Json.format[Span]
@@ -39,9 +41,23 @@ object AzureFormats {
   implicit val readAnalyzeResultFormat = Json.format[ReadAnalyzeResult]
   implicit val azureReadResponseFormat = Json.format[AzureReadResponse]
 
-  implicit val layoutAnalyzeResultFormat = Json.format[LayoutAnalyzeResult]
-  implicit val azureLayoutResponseFormat = Json.format[AzureLayoutResponse]
+//  implicit val layoutAnalyzeResultFormat = Json.format[LayoutAnalyzeResult]
+  implicit val layoutAnalyzeResultFormat: Format[LayoutAnalyzeResult] = {
+    val reads: Reads[LayoutAnalyzeResult] = (
+      (__ \ "apiVersion").read[String] and
+        (__ \ "modelId").read[String] and
+        (__ \ "stringIndexType").read[String] and
+        (__ \ "content").read[String] and
+        (__ \ "pages").read[List[LayoutPage]].orElse(Reads.pure(Nil)) and
+        (__ \ "paragraphs").read[List[Paragraph]].orElse(Reads.pure(Nil)) and
+        (__ \ "tables").read[List[Table]].orElse(Reads.pure(Nil))
+      )(LayoutAnalyzeResult.apply _)
 
+    val writes: Writes[LayoutAnalyzeResult] = Json.writes[LayoutAnalyzeResult]
+    Format(reads, writes)
+  }
+
+  implicit val azureLayoutResponseFormat = Json.format[AzureLayoutResponse]
   implicit val invoiceAnalyzeResultFormat = Json.format[InvoiceAnalyzeResult]
   implicit val azureInvoiceResponseFormat = Json.format[AzureInvoiceResponse]
 }
