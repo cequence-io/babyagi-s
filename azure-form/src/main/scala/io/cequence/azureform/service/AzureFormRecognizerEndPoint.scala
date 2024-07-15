@@ -1,8 +1,9 @@
 package io.cequence.azureform.service
 
-import io.cequence.azureform.service.ws.EnumValue
+import io.cequence.wsclient.domain.NamedEnumValue
 
-sealed abstract class AzureFormRecognizerEndPoint(value: String = "") extends EnumValue(value)
+sealed abstract class AzureFormRecognizerEndPoint(value: String = "")
+    extends NamedEnumValue(value)
 
 object AzureFormRecognizerEndPoint {
   case object analyze extends AzureFormRecognizerEndPoint
@@ -10,7 +11,8 @@ object AzureFormRecognizerEndPoint {
   case object analyzeResults extends AzureFormRecognizerEndPoint
 }
 
-sealed abstract class AzureFormRecognizerParam(value: String = "") extends EnumValue(value)
+sealed abstract class AzureFormRecognizerParam(value: String = "")
+    extends NamedEnumValue(value)
 
 object AzureFormRecognizerParam {
   case object api_version extends AzureFormRecognizerParam("api-version")

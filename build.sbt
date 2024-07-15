@@ -16,16 +16,20 @@ lazy val next = (project in file("babyagi-s-next"))
 
 lazy val azure_form_domain = (project in file("azure-form-domain"))
 
-lazy val azure_form = (project in file("azure-form"))
-  .aggregate(azure_form_domain)
-  .dependsOn(azure_form_domain)
+lazy val azure_form =
+  (project in file("azure-form")).aggregate(azure_form_domain).dependsOn(azure_form_domain)
 
 // POM settings for Sonatype
 ThisBuild / homepage := Some(url("https://github.com/cequence-io/babyagi-s"))
 
 ThisBuild / sonatypeProfileName := "io.cequence"
 
-ThisBuild / scmInfo := Some(ScmInfo(url("https://github.com/cequence-io/babyagi-s"), "scm:git@github.com:cequence-io/babyagi-s.git"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/cequence-io/babyagi-s"),
+    "scm:git@github.com:cequence-io/babyagi-s.git"
+  )
+)
 
 ThisBuild / developers := List(
   Developer("bnd", "Peter Banda", "peter.banda@protonmail.com", url("https://peterbanda.net"))
