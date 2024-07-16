@@ -44,6 +44,6 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.2.15" % "test",
   "ch.qos.logback" % "logback-classic" % "1.4.7" % Runtime,
-  "io.cequence" %% "ws-client-core" % "0.2.0",
-  "io.cequence" %% "ws-client-play" % "0.2.0"
+  "io.cequence" %% "ws-client-core" % "0.5.1",
+  "io.cequence" %% "ws-client-play" % "0.5.1"
 )
