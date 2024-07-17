@@ -3,11 +3,11 @@ import sbt.Keys.test
 // Supported versions
 val scala212 = "2.12.15"
 val scala213 = "2.13.10"
-val scala3 = "3.2.2"
+val scala32 = "3.2.2"
 
 ThisBuild / organization := "io.cequence"
 ThisBuild / scalaVersion := scala212
-ThisBuild / version := "0.1.2"
+ThisBuild / version := "0.1.3"
 ThisBuild / isSnapshot := false
 
 lazy val port = (project in file("babyagi-s-port"))

@@ -20,4 +20,6 @@ object AzureFormRecognizerParam {
   case object source extends AzureFormRecognizerParam
   case object base64Source extends AzureFormRecognizerParam
   case object pages extends AzureFormRecognizerParam
+  case object overload extends AzureFormRecognizerParam("_overload")
+  case object features extends AzureFormRecognizerParam
 }

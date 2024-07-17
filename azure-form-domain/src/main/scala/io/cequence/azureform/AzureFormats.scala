@@ -38,19 +38,32 @@ object AzureFormats {
   implicit val fieldsFormat = Jsonx.formatCaseClass[InvoiceFields]
   implicit val documentFormat = Json.format[Document]
 
-  implicit val readAnalyzeResultFormat = Json.format[ReadAnalyzeResult]
+  implicit val readAnalyzeResultFormat: Format[ReadAnalyzeResult] = {
+    val reads: Reads[ReadAnalyzeResult] = (
+      (__ \ "apiVersion").read[String] and
+        (__ \ "modelId").read[String] and
+        (__ \ "stringIndexType").read[String] and
+        (__ \ "content").read[String] and
+        (__ \ "pages").read[Seq[Page]].orElse(Reads.pure(Nil)) and
+        (__ \ "languages").read[Seq[Language]].orElse(Reads.pure(Nil)) and
+        (__ \ "paragraphs").read[Seq[Paragraph]].orElse(Reads.pure(Nil))
+      )(ReadAnalyzeResult.apply _)
+
+    val writes: Writes[ReadAnalyzeResult] = Json.writes[ReadAnalyzeResult]
+    Format(reads, writes)
+  }
+
   implicit val azureReadResponseFormat = Json.format[AzureReadResponse]
 
-//  implicit val layoutAnalyzeResultFormat = Json.format[LayoutAnalyzeResult]
   implicit val layoutAnalyzeResultFormat: Format[LayoutAnalyzeResult] = {
     val reads: Reads[LayoutAnalyzeResult] = (
       (__ \ "apiVersion").read[String] and
         (__ \ "modelId").read[String] and
         (__ \ "stringIndexType").read[String] and
         (__ \ "content").read[String] and
-        (__ \ "pages").read[List[LayoutPage]].orElse(Reads.pure(Nil)) and
-        (__ \ "paragraphs").read[List[Paragraph]].orElse(Reads.pure(Nil)) and
-        (__ \ "tables").read[List[Table]].orElse(Reads.pure(Nil))
+        (__ \ "pages").read[Seq[LayoutPage]].orElse(Reads.pure(Nil)) and
+        (__ \ "paragraphs").read[Seq[Paragraph]].orElse(Reads.pure(Nil)) and
+        (__ \ "tables").read[Seq[Table]].orElse(Reads.pure(Nil))
       )(LayoutAnalyzeResult.apply _)
 
     val writes: Writes[LayoutAnalyzeResult] = Json.writes[LayoutAnalyzeResult]

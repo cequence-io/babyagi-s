@@ -19,6 +19,7 @@ case class ReadAnalyzeResult(
   pages: Seq[Page],
   languages: Seq[Language],
   paragraphs: Seq[Paragraph]
+  // TODO: add styles
 )
 
 case class Span(
@@ -46,7 +47,7 @@ case class Page(
   height: Double,
   unit: String,
   spans: Seq[Span],
-  kind: String,
+  kind: Option[String],
   words: Seq[Word],
   lines: Seq[Line]
 )

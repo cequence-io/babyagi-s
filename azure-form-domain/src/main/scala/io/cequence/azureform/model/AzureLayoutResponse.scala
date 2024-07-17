@@ -12,9 +12,9 @@ case class LayoutAnalyzeResult(
   modelId: String,
   stringIndexType: String,
   content: String,
-  pages: List[LayoutPage], // page with selection marks
-  paragraphs: List[Paragraph],
-  tables: List[Table] // extra: compared to ReadAnalyzeResult
+  pages: Seq[LayoutPage], // page with selection marks
+  paragraphs: Seq[Paragraph],
+  tables: Seq[Table] // extra: compared to ReadAnalyzeResult
   // TODO: add styles
 )
 
@@ -25,7 +25,7 @@ case class LayoutPage(
   height: Double,
   unit: String,
   spans: Seq[Span],
-  kind: String,
+  kind: Option[String],
   words: Seq[Word],
   lines: Seq[Line],
   selectionMarks: Option[Seq[SelectionMark]]

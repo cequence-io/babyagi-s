@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import io.cequence.azureform.AzureFormRecognizerClientException
 import io.cequence.azureform.AzureFormats._
 import io.cequence.azureform.model.{
   AzureInvoiceResponse,
@@ -12,26 +13,25 @@ import io.cequence.azureform.model.{
   HasStatus
 }
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
-import io.cequence.wsclient.domain.WsRequestContext
+import io.cequence.wsclient.domain.{RichResponse, WsRequestContext}
 import io.cequence.wsclient.service.WSClientEngine
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
-import io.cequence.wsclient.service.ws.{AzurePlayWSClientEngine}
+import io.cequence.wsclient.service.ws.AzurePlayWSClientEngine
 import org.slf4j.LoggerFactory
-import play.api.libs.ws.{DefaultBodyWritables, StandaloneWSRequest}
 
 import java.io.File
 import scala.concurrent.{ExecutionContext, Future}
 
 private class AzureFormRecognizerServiceImpl(
   endPoint: String,
-  apiKey: String
+  apiKey: String,
+  apiVersion: String
 )(
   implicit val ec: ExecutionContext,
   val materializer: Materializer,
   val actorSystem: ActorSystem
 ) extends AzureFormRecognizerService
     with WSClientWithEngine
-    with DefaultBodyWritables
     with AzureFormRecognizerHelper {
 
   override protected type PEP = AzureFormRecognizerEndPoint
@@ -39,12 +39,17 @@ private class AzureFormRecognizerServiceImpl(
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
-  private val authHeader = ("Ocp-Apim-Subscription-Key" -> apiKey)
-
   override protected val engine: WSClientEngine = AzurePlayWSClientEngine(
     endPoint,
     requestContext = WsRequestContext(
-      authHeaders = Seq(authHeader)
+      authHeaders = Seq(
+        "Ocp-Apim-Subscription-Key" -> apiKey
+      ),
+      extraParams = Seq(
+        AzureFormRecognizerParam.overload
+          .toString() -> "analyzeDocument", // needed for >= v4.0
+        AzureFormRecognizerParam.api_version.toString() -> apiVersion
+      )
     )
   )
 
@@ -52,62 +57,46 @@ private class AzureFormRecognizerServiceImpl(
     urlSource: String,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
-  ): Future[String] = {
-    val bodyParams = jsonBodyParams(
-      Seq(AzureFormRecognizerParam.urlSource -> Some(urlSource)): _*
-    )
-
+    features: Seq[String]
+  ): Future[String] =
     execPOSTRich(
       AzureFormRecognizerEndPoint.analyze,
-      endPointParam = Some(modelId),
-      params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion),
-        AzureFormRecognizerParam.pages -> pages
-      ),
-      bodyParams = bodyParams
-    ).map { reponse =>
-      getOperationLocation(reponse.headers)
-    }
-  }
+      endPointParam = endPointParamAux(modelId),
+      params = paramsAux(pages, features),
+      bodyParams = jsonBodyParams(
+        params = AzureFormRecognizerParam.urlSource -> Some(urlSource)
+      )
+    ).map(getOperationLocation)
 
   override def analyze(
     file: File,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[String] =
     execPOSTFileRich(
       AzureFormRecognizerEndPoint.analyze,
-      Some(modelId),
-      Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion),
-        AzureFormRecognizerParam.pages -> pages
-      ),
+      endPointParam = endPointParamAux(modelId),
+      urlParams = paramsAux(pages, features),
       file = file
-    ).map { reponse =>
-      getOperationLocation(reponse.headers)
-    }
+    ).map(getOperationLocation)
 
   override def analyzeSource(
     source: Source[ByteString, _],
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[String] =
     execPOSTSourceRich(
       AzureFormRecognizerEndPoint.analyze,
-      Some(modelId),
-      Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion),
-        AzureFormRecognizerParam.pages -> pages
-      ),
+      endPointParam = endPointParamAux(modelId),
+      urlParams = paramsAux(pages, features),
       source
-    ).map { reponse =>
-      getOperationLocation(reponse.headers)
-    }
+    ).map(getOperationLocation)
 
-  private def getOperationLocation(headers: Map[String, Seq[String]]) =
+  private def getOperationLocation(response: RichResponse) = {
+    val headers = response.headers
+
     headers
       .get("operation-location")
       .orElse(headers.get("Operation-Location"))
@@ -115,61 +104,67 @@ private class AzureFormRecognizerServiceImpl(
         _.headOption.map(url => url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("?")))
       )
       .getOrElse(
-        throw new Exception(
-          s"Operation-Location header not found in ${headers.mkString(", ")}"
+        throw new AzureFormRecognizerClientException(
+          s"Operation-Location header not found in ${headers
+              .mkString(", ")}. Status: ${response.status.code} - ${response.status.message}"
         )
       )
+  }
 
   def analyzeReadResults(
     resultsId: String,
-    modelId: String,
-    apiVersion: String
+    modelId: String
   ): Future[AzureReadResponse] =
     execGET(
       AzureFormRecognizerEndPoint.analyzeResults,
-      endPointParam = Some(modelId + "," + resultsId),
-      params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
-      )
+      endPointParam = endPointParamAux(modelId, Some(resultsId))
     ).map(
       _.asSafeJson[AzureReadResponse]
     )
 
   def analyzeLayoutResults(
     resultsId: String,
-    modelId: String,
-    apiVersion: String
+    modelId: String
   ): Future[AzureLayoutResponse] =
     execGET(
       AzureFormRecognizerEndPoint.analyzeResults,
-      endPointParam = Some(modelId + "," + resultsId),
-      params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
-      )
+      endPointParam = endPointParamAux(modelId, Some(resultsId))
     ).map(
       _.asSafeJson[AzureLayoutResponse]
     )
 
   def analyzeInvoiceResults(
     resultsId: String,
-    modelId: String,
-    apiVersion: String
+    modelId: String
   ): Future[AzureInvoiceResponse] =
     execGET(
       AzureFormRecognizerEndPoint.analyzeResults,
-      endPointParam = Some(modelId + "," + resultsId),
-      params = Seq(
-        AzureFormRecognizerParam.api_version -> Some(apiVersion)
-      )
+      endPointParam = endPointParamAux(modelId, Some(resultsId))
     ).map(
       _.asSafeJson[AzureInvoiceResponse]
     )
+
+  private def endPointParamAux(
+    modelId: String,
+    resultsId: Option[String] = None
+  ) = resultsId match {
+    case Some(id) => Some(apiVersion + "," + modelId + "," + id)
+    case None     => Some(apiVersion + "," + modelId)
+  }
+
+  private def paramsAux(
+    pages: Option[String],
+    features: Seq[String]
+  ) =
+    Seq(
+      AzureFormRecognizerParam.pages -> pages
+    ) ++ features.map(feat => AzureFormRecognizerParam.features -> Some(feat))
 
   override def analyzeRead(
     file: File,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
       analyze,
@@ -178,14 +173,14 @@ private class AzureFormRecognizerServiceImpl(
       file,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   override def analyzeLayout(
     file: File,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
       analyze,
@@ -194,14 +189,14 @@ private class AzureFormRecognizerServiceImpl(
       file,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   override def analyzeInvoice(
     file: File,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
       analyze,
@@ -210,14 +205,14 @@ private class AzureFormRecognizerServiceImpl(
       file,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   override def analyzeReadSource(
     source: Source[ByteString, _],
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
       analyzeSource,
@@ -226,14 +221,14 @@ private class AzureFormRecognizerServiceImpl(
       source,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   override def analyzeLayoutSource(
     source: Source[ByteString, _],
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
       analyzeSource,
@@ -242,14 +237,14 @@ private class AzureFormRecognizerServiceImpl(
       source,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   override def analyzeInvoiceSource(
     source: Source[ByteString, _],
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
       analyzeSource,
@@ -258,14 +253,14 @@ private class AzureFormRecognizerServiceImpl(
       source,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   override def analyzeReadRemote(
     urlSource: String,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
       analyzeRemote,
@@ -274,14 +269,14 @@ private class AzureFormRecognizerServiceImpl(
       urlSource,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   override def analyzeLayoutRemote(
     urlSource: String,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
       analyzeRemote,
@@ -290,14 +285,14 @@ private class AzureFormRecognizerServiceImpl(
       urlSource,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   override def analyzeInvoiceRemote(
     urlSource: String,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
       analyzeRemote,
@@ -306,43 +301,38 @@ private class AzureFormRecognizerServiceImpl(
       urlSource,
       modelId,
       pages,
-      apiVersion
+      features
     )
 
   // aux/helper functions
 
-  protected def analyzeWithResultsAux[T <: HasStatus, IN](
-    analyzeFun: (IN, String, Option[String], String) => Future[String],
-    analyzeResultsFun: (String, String, String) => Future[T]
+  private def analyzeWithResultsAux[T <: HasStatus, IN](
+    analyzeFun: (IN, String, Option[String], Seq[String]) => Future[String],
+    analyzeResultsFun: (String, String) => Future[T]
   )(
     input: IN,
     modelId: String,
     pages: Option[String],
-    apiVersion: String
+    features: Seq[String]
   ): Future[T] =
     for {
-      resultId <- analyzeFun(input, modelId, pages, apiVersion)
+      resultId <- analyzeFun(input, modelId, pages, features)
 
       result <- pollUntilDone(
-        analyzeResultsFun(resultId, modelId, apiVersion)
+        analyzeResultsFun(resultId, modelId)
       )
     } yield result
-
-  private def execRequestHeadersAux(
-    request: StandaloneWSRequest,
-    exec: StandaloneWSRequest => Future[StandaloneWSRequest#Response]
-  ): Future[Map[String, Seq[String]]] =
-    exec(request).map(_.headers.map(h => h._1 -> h._2.toSeq))
-
 }
 
-object AzureFormRecognizerServiceFactory {
+object AzureFormRecognizerServiceFactory extends AzureFormRecognizerConsts {
   def apply(
     endPoint: String,
-    apiKey: String
+    apiKey: String,
+    apiVersion: String = Defaults.version
   )(
     implicit ec: ExecutionContext,
     materializer: Materializer,
     actorSystem: ActorSystem
-  ): AzureFormRecognizerService = new AzureFormRecognizerServiceImpl(endPoint, apiKey)
+  ): AzureFormRecognizerService =
+    new AzureFormRecognizerServiceImpl(endPoint, apiKey, apiVersion)
 }
