@@ -23,4 +23,3 @@ class AzureFormRecognizerClientUnknownHostException(
 
   def this(message: String) = this(message, null)
 }
-

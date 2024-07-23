@@ -768,7 +768,8 @@ trait AzureFormRecognizerHelper extends PolygonHelper {
     compareCoorRelativeToPage: Boolean = false,
     minCoorDiffPercent: Double = 0.1,
     ignoreTables: Boolean = false,
-    addWords: Boolean = false
+    addWords: Boolean = false,
+    filterTables: Option[TableInfoAux => Boolean] = None
   ): Seq[PageContent] = {
     val tableInfos =
       if (ignoreTables)
@@ -776,9 +777,14 @@ trait AzureFormRecognizerHelper extends PolygonHelper {
       else
         extractTableInfos(layoutAnalyzeResult, relaxedCentroidCheck)
 
+    val filteredTableInfos = filterTables match {
+      case Some(filter) => tableInfos.filter(filter)
+      case None => tableInfos
+    }
+
     extractPageContentsSortedAux(
       layoutAnalyzeResult,
-      tableInfos,
+      filteredTableInfos,
       relaxedCentroidCheck,
       compareCoorRelativeToPage,
       minCoorDiffPercent,
@@ -788,13 +794,25 @@ trait AzureFormRecognizerHelper extends PolygonHelper {
 
   protected def extractPageContents(
     layoutAnalyzeResult: LayoutAnalyzeResult,
-    relaxedCentroidCheck: Boolean = false
+    relaxedCentroidCheck: Boolean = false,
+    ignoreTables: Boolean = false,
+    filterTables: Option[TableInfoAux => Boolean] = None
   ): Seq[PageContent] = {
-    val tableInfos = extractTableInfos(layoutAnalyzeResult, relaxedCentroidCheck)
-    extractPageContentsAux(layoutAnalyzeResult, tableInfos, relaxedCentroidCheck)
+    val tableInfos =
+      if (ignoreTables)
+        Nil
+      else
+        extractTableInfos(layoutAnalyzeResult, relaxedCentroidCheck)
+
+    val filteredTableInfos = filterTables match {
+      case Some(filter) => tableInfos.filter(filter)
+      case None => tableInfos
+    }
+
+    extractPageContentsAux(layoutAnalyzeResult, filteredTableInfos, relaxedCentroidCheck)
   }
 
-  private def extractTableInfos(
+  protected def extractTableInfos(
     layoutAnalyzeResult: LayoutAnalyzeResult,
     relaxedCentroidCheck: Boolean
   ): Seq[TableInfoAux] = {
@@ -964,16 +982,16 @@ trait AzureFormRecognizerHelper extends PolygonHelper {
       } ++ (afterRowLine.map(Seq(_)).getOrElse(Nil))
     }
   }
-}
 
-private case class TableInfoAux(
-  pageNumber: Int,
-  pageWidth: Double,
-  pageHeight: Double,
-  boundingPolygon: Seq[Double],
-  tableNumber: Int,
-  rowCount: Int,
-  columnCount: Int,
-  minLineIndex: Int,
-  newLines: Seq[String]
-)
+  protected case class TableInfoAux(
+    pageNumber: Int,
+    pageWidth: Double,
+    pageHeight: Double,
+    boundingPolygon: Seq[Double],
+    tableNumber: Int,
+    rowCount: Int,
+    columnCount: Int,
+    minLineIndex: Int,
+    newLines: Seq[String]
+  )
+}

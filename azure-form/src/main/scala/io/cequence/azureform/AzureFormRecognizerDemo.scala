@@ -2,7 +2,11 @@ package io.cequence.azureform
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
-import io.cequence.azureform.model.AzureFormRecognizerApiVersion
+import io.cequence.azureform.model.{
+  AzureFormRecognizerApiVersion,
+  AzureFormRecognizerAnalyzeSettings,
+  ContentFormat
+}
 import io.cequence.azureform.service.{
   AzureFormRecognizerHelper,
   AzureFormRecognizerServiceFactory
@@ -26,8 +30,13 @@ object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
     AzureFormRecognizerApiVersion.v2024_02_29_preview
   )
 
-  private val pages = Some("1-2")
-  private val features = Nil // Seq("languages") // "styleFont",
+  private val showContent = false
+
+  private val settings = AzureFormRecognizerAnalyzeSettings(
+    pages = Some("1-2"),
+//    features = Seq("languages"), // "styleFont",
+//    outputContentFormat = Some(ContentFormat.markdown)
+  )
 
   // run for given versions
   AkkaSource
@@ -55,14 +64,12 @@ object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
       for {
         readResult <- service.analyzeRead(
           file = new java.io.File(fileName),
-          pages = pages,
-          features = features
+          settings = settings
         )
 
         layoutResult <- service.analyzeLayout(
           file = new java.io.File(fileName),
-          pages = pages,
-          features = features
+          settings = settings
         )
       } yield {
         val readResultSection = readResult.analyzeResult.getOrElse(
@@ -79,15 +86,30 @@ object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
         println(s"Pages #      : ${readResultSection.pages.size}")
         println(s"Lines #      : ${readResultSection.pages.map(_.lines.size).sum}")
         println(s"Content size : ${readResultSection.content.length}")
-        println(s"Languages    : ${readResultSection.languages.size}")
+        println(s"Languages    : ${readResultSection.languages.map(_.locale).mkString(", ")}")
 
+        if (showContent)
+          println(s"Content:\n${readResultSection.content}")
+
+        println
         println("Layout Result:")
 
-        println(s"API-Version  : ${layoutResultSection.apiVersion}")
-        println(s"Pages #      : ${layoutResultSection.pages.size}")
-        println(s"Tables #     : ${layoutResultSection.tables.size}")
-        println(s"Lines #      : ${layoutResultSection.pages.map(_.lines.size).sum}")
-        println(s"Content size : ${layoutResultSection.content.length}")
+        println(s"API-Version     : ${layoutResultSection.apiVersion}")
+        println(s"Pages #         : ${layoutResultSection.pages.size}")
+        println(s"Tables #        : ${layoutResultSection.tables.size}")
+        println(s"Lines #         : ${layoutResultSection.pages.map(_.lines.size).sum}")
+        println(s"Content size    : ${layoutResultSection.content.length}")
+        println(s"Content format  : ${layoutResultSection.contentFormat.getOrElse("N/A")}")
+        println(
+          s"Languages       : ${layoutResultSection.languages.map(_.locale).mkString(", ")}"
+        )
+        println(
+          s"Paragraph Roles : ${layoutResultSection.paragraphs.flatMap(par => par.role).mkString(", ")}"
+        )
+
+        if (showContent)
+          println(s"Content:\n${layoutResultSection.content}")
+
         println
         service.close()
       }

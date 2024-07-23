@@ -3,31 +3,29 @@ package io.cequence.azureform.service
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import io.cequence.azureform.model._
+import io.cequence.wsclient.service.CloseableService
 
 import java.io.File
 import scala.concurrent.Future
 
-trait AzureFormRecognizerService extends AzureFormRecognizerConsts {
+trait AzureFormRecognizerService extends AzureFormRecognizerConsts with CloseableService {
 
   def analyze(
     file: File,
     modelId: String,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[String]
 
   def analyzeSource(
     source: Source[ByteString, _],
     modelId: String,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+  settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[String]
 
   def analyzeRemote(
     urlSource: String,
     modelId: String,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[String]
 
   def analyzeReadResults(
@@ -48,65 +46,54 @@ trait AzureFormRecognizerService extends AzureFormRecognizerConsts {
   def analyzeRead(
     file: File,
     modelId: String = Defaults.readModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureReadResponse]
 
   def analyzeLayout(
     file: File,
     modelId: String = Defaults.layoutModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureLayoutResponse]
 
   def analyzeInvoice(
     file: File,
     modelId: String = Defaults.invoiceModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureInvoiceResponse]
 
   def analyzeReadSource(
     source: Source[ByteString, _],
     modelId: String = Defaults.readModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureReadResponse]
 
   def analyzeLayoutSource(
     source: Source[ByteString, _],
     modelId: String = Defaults.layoutModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureLayoutResponse]
 
   def analyzeInvoiceSource(
     source: Source[ByteString, _],
     modelId: String = Defaults.invoiceModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureInvoiceResponse]
 
   def analyzeReadRemote(
     urlSource: String,
     modelId: String = Defaults.readModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureReadResponse]
 
   def analyzeLayoutRemote(
     urlSource: String,
     modelId: String = Defaults.layoutModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureLayoutResponse]
 
   def analyzeInvoiceRemote(
     urlSource: String,
     modelId: String = Defaults.invoiceModel,
-    pages: Option[String] = None,
-    features: Seq[String] = Nil
+    settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureInvoiceResponse]
-
-  def close(): Unit
 }

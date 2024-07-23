@@ -4,6 +4,7 @@ case class AzureLayoutResponse(
   status: String,
   createdDateTime: String,
   lastUpdatedDateTime: String,
+  // content_format
   analyzeResult: Option[LayoutAnalyzeResult]
 ) extends HasStatus
 
@@ -14,8 +15,11 @@ case class LayoutAnalyzeResult(
   content: String,
   pages: Seq[LayoutPage], // page with selection marks
   paragraphs: Seq[Paragraph],
-  tables: Seq[Table] // extra: compared to ReadAnalyzeResult
-  // TODO: add styles
+  tables: Seq[Table],
+  languages: Seq[Language],
+  contentFormat: Option[ContentFormat]
+
+  // TODO: add styles and sections
 )
 
 case class LayoutPage(

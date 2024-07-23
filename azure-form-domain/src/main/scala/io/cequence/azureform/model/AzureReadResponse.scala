@@ -17,8 +17,8 @@ case class ReadAnalyzeResult(
   stringIndexType: String,
   content: String,
   pages: Seq[Page],
-  languages: Seq[Language],
-  paragraphs: Seq[Paragraph]
+  paragraphs: Seq[Paragraph],
+  languages: Seq[Language]
   // TODO: add styles
 )
 
@@ -67,5 +67,6 @@ case class BoundingRegion(
 case class Paragraph(
   boundingRegions: Seq[BoundingRegion],
   spans: Seq[Span],
-  content: String
+  content: String,
+  role: Option[ParagraphRole]
 )

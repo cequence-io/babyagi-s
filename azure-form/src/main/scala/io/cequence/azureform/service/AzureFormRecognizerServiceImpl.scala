@@ -6,12 +6,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import io.cequence.azureform.AzureFormRecognizerClientException
 import io.cequence.azureform.AzureFormats._
-import io.cequence.azureform.model.{
-  AzureInvoiceResponse,
-  AzureLayoutResponse,
-  AzureReadResponse,
-  HasStatus
-}
+import io.cequence.azureform.model.{AzureFormRecognizerAnalyzeSettings, AzureInvoiceResponse, AzureLayoutResponse, AzureReadResponse, HasStatus}
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
 import io.cequence.wsclient.domain.{RichResponse, WsRequestContext}
 import io.cequence.wsclient.service.WSClientEngine
@@ -56,13 +51,12 @@ private class AzureFormRecognizerServiceImpl(
   override def analyzeRemote(
     urlSource: String,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[String] =
     execPOSTRich(
       AzureFormRecognizerEndPoint.analyze,
       endPointParam = endPointParamAux(modelId),
-      params = paramsAux(pages, features),
+      params = paramsAux(settings),
       bodyParams = jsonBodyParams(
         params = AzureFormRecognizerParam.urlSource -> Some(urlSource)
       )
@@ -71,26 +65,24 @@ private class AzureFormRecognizerServiceImpl(
   override def analyze(
     file: File,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[String] =
     execPOSTFileRich(
       AzureFormRecognizerEndPoint.analyze,
       endPointParam = endPointParamAux(modelId),
-      urlParams = paramsAux(pages, features),
+      urlParams = paramsAux(settings),
       file = file
     ).map(getOperationLocation)
 
   override def analyzeSource(
     source: Source[ByteString, _],
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[String] =
     execPOSTSourceRich(
       AzureFormRecognizerEndPoint.analyze,
       endPointParam = endPointParamAux(modelId),
-      urlParams = paramsAux(pages, features),
+      urlParams = paramsAux(settings),
       source
     ).map(getOperationLocation)
 
@@ -152,19 +144,16 @@ private class AzureFormRecognizerServiceImpl(
     case None     => Some(apiVersion + "," + modelId)
   }
 
-  private def paramsAux(
-    pages: Option[String],
-    features: Seq[String]
-  ) =
+  private def paramsAux(settings: AzureFormRecognizerAnalyzeSettings) =
     Seq(
-      AzureFormRecognizerParam.pages -> pages
-    ) ++ features.map(feat => AzureFormRecognizerParam.features -> Some(feat))
+      AzureFormRecognizerParam.pages -> settings.pages,
+      AzureFormRecognizerParam.outputContentFormat -> settings.outputContentFormat.map(_.toString)
+    ) ++ settings.features.map(feat => AzureFormRecognizerParam.features -> Some(feat))
 
   override def analyzeRead(
     file: File,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
       analyze,
@@ -172,15 +161,13 @@ private class AzureFormRecognizerServiceImpl(
     )(
       file,
       modelId,
-      pages,
-      features
+      settings
     )
 
   override def analyzeLayout(
     file: File,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
       analyze,
@@ -188,15 +175,13 @@ private class AzureFormRecognizerServiceImpl(
     )(
       file,
       modelId,
-      pages,
-      features
+      settings
     )
 
   override def analyzeInvoice(
     file: File,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
       analyze,
@@ -204,15 +189,13 @@ private class AzureFormRecognizerServiceImpl(
     )(
       file,
       modelId,
-      pages,
-      features
+      settings
     )
 
   override def analyzeReadSource(
     source: Source[ByteString, _],
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
       analyzeSource,
@@ -220,15 +203,13 @@ private class AzureFormRecognizerServiceImpl(
     )(
       source,
       modelId,
-      pages,
-      features
+      settings
     )
 
   override def analyzeLayoutSource(
     source: Source[ByteString, _],
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
       analyzeSource,
@@ -236,15 +217,13 @@ private class AzureFormRecognizerServiceImpl(
     )(
       source,
       modelId,
-      pages,
-      features
+      settings
     )
 
   override def analyzeInvoiceSource(
     source: Source[ByteString, _],
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
       analyzeSource,
@@ -252,15 +231,13 @@ private class AzureFormRecognizerServiceImpl(
     )(
       source,
       modelId,
-      pages,
-      features
+      settings
     )
 
   override def analyzeReadRemote(
     urlSource: String,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureReadResponse] =
     analyzeWithResultsAux(
       analyzeRemote,
@@ -268,15 +245,13 @@ private class AzureFormRecognizerServiceImpl(
     )(
       urlSource,
       modelId,
-      pages,
-      features
+      settings
     )
 
   override def analyzeLayoutRemote(
     urlSource: String,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureLayoutResponse] =
     analyzeWithResultsAux(
       analyzeRemote,
@@ -284,15 +259,13 @@ private class AzureFormRecognizerServiceImpl(
     )(
       urlSource,
       modelId,
-      pages,
-      features
+      settings
     )
 
   override def analyzeInvoiceRemote(
     urlSource: String,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[AzureInvoiceResponse] =
     analyzeWithResultsAux(
       analyzeRemote,
@@ -300,23 +273,21 @@ private class AzureFormRecognizerServiceImpl(
     )(
       urlSource,
       modelId,
-      pages,
-      features
+      settings
     )
 
   // aux/helper functions
 
   private def analyzeWithResultsAux[T <: HasStatus, IN](
-    analyzeFun: (IN, String, Option[String], Seq[String]) => Future[String],
-    analyzeResultsFun: (String, String) => Future[T]
+                                                         analyzeFun: (IN, String, AzureFormRecognizerAnalyzeSettings) => Future[String],
+                                                         analyzeResultsFun: (String, String) => Future[T]
   )(
     input: IN,
     modelId: String,
-    pages: Option[String],
-    features: Seq[String]
+    settings: AzureFormRecognizerAnalyzeSettings
   ): Future[T] =
     for {
-      resultId <- analyzeFun(input, modelId, pages, features)
+      resultId <- analyzeFun(input, modelId, settings)
 
       result <- pollUntilDone(
         analyzeResultsFun(resultId, modelId)

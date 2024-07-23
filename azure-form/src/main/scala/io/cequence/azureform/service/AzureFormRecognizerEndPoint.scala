@@ -22,4 +22,5 @@ object AzureFormRecognizerParam {
   case object pages extends AzureFormRecognizerParam
   case object overload extends AzureFormRecognizerParam("_overload")
   case object features extends AzureFormRecognizerParam
+  case object outputContentFormat extends AzureFormRecognizerParam
 }
