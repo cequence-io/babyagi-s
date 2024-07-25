@@ -45,7 +45,39 @@ object AzureFormats {
   implicit val valueObjectFormat = Json.format[ValueObject]
   implicit val valueArrayFormat = Json.format[ValueArray]
   implicit val itemsFormat = Json.format[Items]
-  implicit val fieldsFormat = Jsonx.formatCaseClass[InvoiceFields]
+  // TODO: find a way to get rid of Jsonx.formatCaseClass (22+ fields)
+  implicit val invoiceFieldsFormat = Jsonx.formatCaseClass[InvoiceFields]
+
+//  implicit val invoiceFieldsFormat: Format[InvoiceFields] = (
+//    (__ \ "ServiceAddress").formatNullable[ValueAddressEntry] and
+//      (__ \ "ServiceAddressRecipient").formatNullable[ValueStringEntry] and
+//      (__ \ "PreviousUnpaidBalance").formatNullable[ValueCurrencyEntry] and
+//      (__ \ "RemittanceAddressRecipient").formatNullable[ValueStringEntry] and
+//      (__ \ "InvoiceId").formatNullable[ValueStringEntry] and
+//      (__ \ "SubTotal").formatNullable[ValueCurrencyEntry] and
+//      (__ \ "BillingAddress").formatNullable[ValueAddressEntry] and
+//      (__ \ "TotalTax").formatNullable[ValueCurrencyEntry] and
+//      (__ \ "ServiceStartDate").formatNullable[ValueDateEntry] and
+//      (__ \ "Items").formatNullable[Items] and
+//      (__ \ "CustomerName").formatNullable[ValueStringEntry] and
+//      (__ \ "InvoiceDate").formatNullable[ValueDateEntry] and
+//      (__ \ "DueDate").formatNullable[ValueDateEntry] and
+//      (__ \ "CustomerAddressRecipient").formatNullable[ValueStringEntry] and
+//      (__ \ "RemittanceAddress").formatNullable[ValueAddressEntry] and
+//      (__ \ "AmountDue").formatNullable[ValueCurrencyEntry] and
+//      (__ \ "VendorName").formatNullable[ValueStringEntry] and
+//      (__ \ "ServiceEndDate").formatNullable[ValueDateEntry] and
+//      (__ \ "CustomerId").formatNullable[ValueStringEntry] and
+//      (__ \ "VendorAddressRecipient").formatNullable[ValueStringEntry] and
+//      (__ \ "ShippingAddressRecipient").formatNullable[ValueStringEntry] and
+//      (__ \ "InvoiceTotal").formatNullable[ValueCurrencyEntry] and
+//      (__ \ "ShippingAddress").formatNullable[ValueAddressEntry] and
+//      (__ \ "BillingAddressRecipient").formatNullable[ValueStringEntry] and
+//      (__ \ "PurchaseOrder").formatNullable[ValueStringEntry] and
+//      (__ \ "VendorAddress").formatNullable[ValueAddressEntry] and
+//      (__ \ "CustomerAddress").formatNullable[ValueAddressEntry]
+//    )(InvoiceFields.apply, unlift(InvoiceFields.unapply))
+
   implicit val documentFormat = Json.format[Document]
 
   implicit val contentFormatFormat: Format[ContentFormat] = enumFormat(

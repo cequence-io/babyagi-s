@@ -2,7 +2,7 @@ name := "azure-form-recognizer"
 
 description := "Client and utils for Azure Form Recognizer"
 
-val wsClientVersion = "0.5.2"
+val wsClientVersion = "0.5.4"
 
 libraryDependencies ++= Seq(
   "io.cequence" %% "ws-client-core" % wsClientVersion,
