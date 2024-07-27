@@ -2,7 +2,7 @@ name := "azure-form-recognizer-domain"
 
 description := "Domain for Azure Form Recognizer"
 
-val wsClientVersion = "0.5.4"
+val wsClientVersion = "0.5.6"
 
 libraryDependencies ++= Seq(
   "io.cequence" %% "ws-client-core" % wsClientVersion,
