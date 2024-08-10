@@ -818,7 +818,7 @@ trait AzureFormRecognizerHelper extends PolygonHelper {
   ): Seq[TableInfoAux] = {
     val pageNumberMap = layoutAnalyzeResult.pages.map(page => (page.pageNumber, page)).toMap
 
-    layoutAnalyzeResult.tables.zipWithIndex.map { case (table, tableIndex) =>
+    layoutAnalyzeResult.tables.zipWithIndex.flatMap { case (table, tableIndex) =>
       val boundingRegion = table.boundingRegions.head
       val pageNumber = boundingRegion.pageNumber
       val page = pageNumberMap
@@ -828,25 +828,33 @@ trait AzureFormRecognizerHelper extends PolygonHelper {
         )
 
       val tableLines = findTableLines(layoutAnalyzeResult, table, relaxedCentroidCheck)
-      validateTableLines(tableLines, page, table, tableIndex)
 
-      val originalTableLineContents = tableLines.map(_._1.content)
-      val newLines =
-        tableToLines(table, originalTableLineContents, rowDelimiter = Some("--"))
+      if (tableLines.nonEmpty) {
+        validateTableLines(tableLines, page, table, tableIndex)
 
-      val minLineIndex = tableLines.map(_._2).min
+        val originalTableLineContents = tableLines.map(_._1.content)
+        val newLines =
+          tableToLines(table, originalTableLineContents, rowDelimiter = Some("--"))
 
-      TableInfoAux(
-        pageNumber,
-        page.width,
-        page.height,
-        boundingRegion.polygon,
-        tableIndex + 1, // starting from 1
-        table.rowCount,
-        table.columnCount,
-        minLineIndex,
-        newLines
-      )
+        val minLineIndex = tableLines.map(_._2).min
+
+        val infoAux = TableInfoAux(
+          pageNumber,
+          page.width,
+          page.height,
+          boundingRegion.polygon,
+          tableIndex + 1, // starting from 1
+          table.rowCount,
+          table.columnCount,
+          minLineIndex,
+          newLines
+        )
+
+        Some(infoAux)
+      } else {
+        logger.warn(s"Table ${tableIndex} at the page ${pageNumber} has no lines.")
+        None
+      }
     }
   }
 
