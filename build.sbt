@@ -25,8 +25,7 @@ lazy val cohere_client_domain = (project in file("cohere-domain"))
 
 lazy val cohere_client =
   (project in file("cohere"))
-    .aggregate(cohere_client_domain)
-    .aggregate(azure_form)
+    .aggregate(cohere_client_domain, azure_form)
     .dependsOn(cohere_client_domain)
 
 // POM settings for Sonatype
