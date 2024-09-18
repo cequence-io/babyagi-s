@@ -24,7 +24,6 @@ object JsonFormats {
 
   // segmenter
   implicit lazy val segmenterSettingsFormat: Format[SegmenterSettings] = Json.format[SegmenterSettings]
-  implicit lazy val segmenterDataFormat: Format[SegmenterData] = Json.format[SegmenterData]
 
   // TODO: move to ws client
   implicit lazy val segmenterResponseFormat: Format[SegmenterResponse] = {
@@ -34,7 +33,7 @@ object JsonFormats {
         if (maybeJsons.exists(_.isEmpty)) {
           JsError("One or more elements in the array are null")
         } else {
-          JsSuccess(maybeJsons.map(_.get))
+          JsSuccess(maybeJsons.map(_.get).toSeq)
         }
       }
 

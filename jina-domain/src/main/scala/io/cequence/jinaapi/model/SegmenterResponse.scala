@@ -7,7 +7,3 @@ case class SegmenterResponse(
   chunk_positions: Seq[Seq[Any]],
   chunks: Seq[String]
 )
-
-case class SegmenterData(
-  data: String
-)

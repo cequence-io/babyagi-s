@@ -35,7 +35,7 @@ sealed trait EmbeddingType extends EnumValue
 
 object EmbeddingType {
   case object float extends EmbeddingType
-  case object int8 extends EmbeddingType
+  case object `int8` extends EmbeddingType
   case object uint8 extends EmbeddingType
   case object binary extends EmbeddingType
   case object ubinary extends EmbeddingType

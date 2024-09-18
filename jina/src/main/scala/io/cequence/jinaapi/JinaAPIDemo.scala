@@ -3,7 +3,7 @@ package io.cequence.jinaapi
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
 import io.cequence.jinaapi.model._
-import io.cequence.jinaapi.service.JinaServiceFactory
+import io.cequence.jinaapi.service.{JinaChunkingRegex, JinaServiceFactory}
 
 import java.io.File
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,7 +16,7 @@ object JinaAPIDemo extends App {
 
   private val hamletFile = new File(getClass.getResource("/hamlet.txt").getFile)
   private val hamletContent =
-    scala.io.Source.fromFile(hamletFile).mkString.take(20000).replaceAllLiterally("\n\n", "\n")
+    scala.io.Source.fromFile(hamletFile).mkString.take(20000)
 
   private val rerankDocuments = Seq(
     "Organic skincare for sensitive skin with aloe vera and chamomile: Imagine the soothing embrace of nature with our organic skincare range, crafted specifically for sensitive skin. Infused with the calming properties of aloe vera and chamomile, each product provides gentle nourishment and protection. Say goodbye to irritation and hello to a glowing, healthy complexion.",
@@ -46,13 +46,27 @@ object JinaAPIDemo extends App {
         )
       )
 
+      matches = JinaChunkingRegex.regex.findAllMatchIn(hamletContent).toList
+
       rerankResponse <- service.rerank(
         "Organic skincare products for sensitive skin",
         rerankDocuments
       )
     } yield {
       println("Chunks:")
-      println(segmentResponse.chunks.mkString("\n----------------\n"))
+      println(segmentResponse.chunks.take(10).mkString("----------------\n"))
+
+      println()
+
+      val chunksStarts = Seq(0) ++ matches.map(_.start)
+
+      val chunks2 = chunksStarts.zipWithIndex.map { case (start, index) =>
+        val end = if (index == chunksStarts.length - 1) hamletContent.length else chunksStarts(index + 1)
+        hamletContent.substring(start, end)
+      }
+
+      println("Chunks2:")
+      println(chunks2.take(10).mkString("----------------\n"))
 
       println()
 

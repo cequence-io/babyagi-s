@@ -143,10 +143,9 @@ private class JinaServiceImpl(
         Param.tail -> settings.tail,
         Param.tokenizer -> settings.tokenizer
       )
-    ).map { response =>
-      println(Json.prettyPrint(response.json))
-      response.asSafeJson[SegmenterResponse]
-    }
+    ).map(
+      _.asSafeJson[SegmenterResponse]
+    )
   }
 
   override def rerank(
