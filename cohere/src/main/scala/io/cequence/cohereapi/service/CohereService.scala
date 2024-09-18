@@ -1,7 +1,6 @@
 package io.cequence.cohereapi.service
 
 import io.cequence.cohereapi.model._
-import io.cequence.cohereapi.model.RerankSettings
 import io.cequence.wsclient.service.CloseableService
 
 import scala.concurrent.Future
@@ -85,4 +84,19 @@ trait CohereService extends CohereConsts with CloseableService {
     examples: Seq[(String, String)],
     settings: ClassifySettings = Defaults.Classify
   ): Future[ClassifyResponse]
+
+  /**
+   * This endpoint generates a chat response based on a given message.
+   *
+   * @param message  Text input for the model to respond to.
+   *                 Compatible Deployments: Cohere Platform, Azure, AWS Sagemaker/Bedrock, Private Deployments
+   * @param settings The settings for the chat generation.
+   * @return
+   *
+   * @see <a href="https://docs.cohere.com/reference/chat">Cohere API Doc</a>
+   */
+  def chat(
+    message: String,
+    settings: ChatSettings = Defaults.Chat
+  ): Future[ChatResponse]
 }

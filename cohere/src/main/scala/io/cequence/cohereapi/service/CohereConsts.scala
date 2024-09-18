@@ -1,6 +1,6 @@
 package io.cequence.cohereapi.service
 
-import io.cequence.cohereapi.model.{ClassifySettings, EmbedModelId, EmbedSettings, RerankModelId, RerankSettings}
+import io.cequence.cohereapi.model.{ChatModelId, ChatSettings, ClassifySettings, EmbedModelId, EmbedSettings, RerankModelId, RerankSettings}
 
 trait CohereConsts {
   object Defaults {
@@ -14,6 +14,10 @@ trait CohereConsts {
 
     val Classify = ClassifySettings(
       model = EmbedModelId.embed_english_v2_0
+    )
+
+    val Chat = ChatSettings(
+      model = ChatModelId.command_r_plus_08_2024
     )
   }
 }

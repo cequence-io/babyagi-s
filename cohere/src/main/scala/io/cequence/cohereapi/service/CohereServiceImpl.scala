@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory
 import java.net.UnknownHostException
 import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future}
+import io.cequence.cohereapi.JsonFormats
 
 private class CohereServiceImpl(
   apiKey: String,
@@ -53,6 +54,7 @@ private class CohereServiceImpl(
     val embed = "embed"
     val rerank = "rerank"
     val classify = "classify"
+    val chat = "chat"
   }
 
   object Param {
@@ -70,6 +72,28 @@ private class CohereServiceImpl(
     val texts = "texts"
     val input_type = "input_type"
     val embedding_types = "embedding_types"
+    val message = "message"
+    val user_id = "user_id"
+    val session_id = "session_id"
+    val temperature = "temperature"
+    val max_tokens = "max_tokens"
+    val stop_sequences = "stop_sequences"
+    val return_likelihoods = "return_likelihoods"
+    val search_queries_only = "search_queries_only"
+    val chat_history = "chat_history"
+    val conversation_id = "conversation_id"
+    val prompt_truncation = "prompt_truncation"
+    val connectors = "connectors"
+    val citation_quality = "citation_quality"
+    val preamble = "preamble"
+    val stream = "stream"
+    val max_input_tokens = "max_input_tokens"
+    val k = "k"
+    val p = "p"
+    val seed = "seed"
+    val frequency_penalty = "frequency_penalty"
+    val presence_penalty = "presence_penalty"
+    val response_type = "response_type"
   }
 
   override def embed(
@@ -137,6 +161,44 @@ private class CohereServiceImpl(
     ).map(
       _.asSafeJson[ClassifyResponse]
     )
+ 
+  override def chat(
+    message: String,
+    settings: ChatSettings
+  ): Future[ChatResponse] = {
+    execPOST(
+      Endpoint.chat,
+      bodyParams = jsonBodyParams(
+        Param.model -> Some(settings.model),
+        Param.message -> Some(message),
+        Param.preamble -> settings.preamble,
+        Param.chat_history -> (
+          if (settings.chat_history.nonEmpty)
+            Some(settings.chat_history.map(JsonFormats.chatMessageFormat.writes))
+          else None
+        ),
+        Param.stream -> Some(settings.stream),
+        Param.conversation_id -> settings.conversation_id,
+        Param.prompt_truncation -> settings.prompt_truncation.map(_.toString),
+        Param.search_queries_only -> Some(settings.search_queries_only),
+        Param.citation_quality -> settings.citation_quality.map(_.toString),
+        Param.connectors -> (if (settings.connectors.nonEmpty) Some(settings.connectors.map(JsonFormats.connectorFormat.writes)) else None),
+        Param.documents -> (if (settings.documents.nonEmpty) Some(settings.documents) else None),
+        Param.temperature -> settings.temperature,
+        Param.max_tokens -> settings.max_tokens,
+        Param.max_input_tokens -> settings.max_input_tokens,
+        Param.k -> settings.k,
+        Param.p -> settings.p,
+        Param.seed -> settings.seed,
+        Param.stop_sequences -> (if (settings.stop_sequences.nonEmpty) Some(settings.stop_sequences) else None),
+        Param.frequency_penalty -> settings.frequency_penalty,
+        Param.presence_penalty -> settings.presence_penalty,
+        Param.response_type -> settings.response_type.map(JsonFormats.responseTypeFormat.writes)
+      )
+    ).map(
+      _.asSafeJson[ChatResponse]
+    )
+  }
 }
 
 object CohereServiceFactory {
