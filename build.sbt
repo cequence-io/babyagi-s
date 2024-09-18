@@ -28,6 +28,14 @@ lazy val cohere_client =
     .aggregate(cohere_client_domain, azure_form)
     .dependsOn(cohere_client_domain)
 
+lazy val jina_client_domain = (project in file("jina-domain"))
+
+lazy val jina_client =
+  (project in file("jina"))
+    .aggregate(jina_client_domain, cohere_client)
+    .dependsOn(jina_client_domain)
+
+
 // POM settings for Sonatype
 ThisBuild / homepage := Some(url("https://github.com/cequence-io/babyagi-s"))
 
