@@ -8,17 +8,20 @@ import scala.concurrent.Future
 trait JinaService extends JinaConsts with CloseableService {
 
   def crawl(
-    url: String,
+    input: String,
+    sourceType: CrawlSourceType,
     settings: CrawlerSettings = Defaults.Crawl
   ): Future[CrawlResponse]
 
   def crawlString(
-    url: String,
+    input: String,
+    sourceType: CrawlSourceType,
     settings: CrawlerSettings = Defaults.Crawl
   ): Future[String]
 
   /**
-   * @param content Content length must be greater than 0 and less than 64k
+   * @param content
+   *   Content length must be greater than 0 and less than 64k
    * @param settings
    * @return
    */

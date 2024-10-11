@@ -10,9 +10,9 @@ import io.cequence.wsclient.service.WSClientEngine
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
 import io.cequence.wsclient.service.ws.PlayWSClientEngine
 import org.slf4j.LoggerFactory
-import play.api.libs.json.Json
 
 import java.net.UnknownHostException
+import java.util.Base64
 import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -66,6 +66,8 @@ private class JinaServiceImpl(
     val timeout = "X-Timeout"
     val waitForSelector = "X-Wait-For-Selector"
     val url = "url"
+    val html = "html"
+    val pdf = "pdf"
     val content = "content"
     val return_tokens = "return_tokens"
     val return_chunks = "return_chunks"
@@ -80,27 +82,27 @@ private class JinaServiceImpl(
   }
 
   override def crawl(
-    url: String,
+    input: String,
+    sourceType: CrawlSourceType,
     settings: CrawlerSettings
   ): Future[CrawlResponse] =
     execPOST(
       Endpoint.crawl,
-      bodyParams = jsonBodyParams(
-        params = Param.url -> Some(url)
-      ),
+      bodyParams = crawlBodyParams(input, sourceType),
       extraHeaders = crawlHeaders(settings, useJsonResponse = true)
     ).map(
       _.asSafeJson[CrawlResponse]
     )
 
   override def crawlString(
-    url: String,
+    input: String,
+    sourceType: CrawlSourceType,
     settings: CrawlerSettings
   ): Future[String] =
     execPOST(
       Endpoint.crawl,
-      bodyParams = jsonBodyParams(
-        params = Param.url -> Some(url)
+      bodyParams = crawlBodyParams(
+        input, sourceType
       ),
       extraHeaders = crawlHeaders(settings, useJsonResponse = false)
     ).map(
@@ -121,6 +123,31 @@ private class JinaServiceImpl(
     Param.timeout -> settings.timeout.map(_.toString),
     Param.waitForSelector -> settings.waitForSelector
   ).collect { case (key, Some(value)) => (key, value) }
+
+  private def crawlBodyParams(
+    input: String,
+    sourceType: CrawlSourceType
+  ) = {
+    val params = sourceType match {
+      case CrawlSourceType.url =>
+        Seq(Param.url -> Some(input))
+
+      case CrawlSourceType.html =>
+        Seq(
+          Param.html -> Some(input),
+          Param.url -> Some("")
+        )
+
+      case CrawlSourceType.pdf =>
+        val encodedPDF = Base64.getEncoder.encodeToString(input.getBytes("UTF-8"))
+        Seq(
+          Param.pdf -> Some(encodedPDF),
+          Param.url -> Some("")
+        )
+    }
+
+    jsonBodyParams(params = params:_*)
+  }
 
   override def segment(
     content: String,

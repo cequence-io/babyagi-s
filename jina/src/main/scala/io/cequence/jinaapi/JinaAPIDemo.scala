@@ -7,12 +7,17 @@ import io.cequence.jinaapi.service.{JinaChunkingRegex, JinaServiceFactory}
 
 import java.io.File
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.io.Source
 
 object JinaAPIDemo extends App {
   private implicit val actorSystem: ActorSystem = ActorSystem()
   private implicit val materializer: Materializer = ActorMaterializer()
 
   private val service = JinaServiceFactory()
+
+  private val testHtmlFile = "xxx"
+
+  private val testPdfFile = "xxxx"
 
   private val hamletFile = new File(getClass.getResource("/hamlet.txt").getFile)
   private val hamletContent =
@@ -33,9 +38,33 @@ object JinaAPIDemo extends App {
 
   {
     for {
-      jsonResponse <- service.crawl("https://www.cnn.com/")
+      crawlResponse1 <- service.crawl(
+        "https://www.cnn.com/",
+        CrawlSourceType.url,
+      )
 
-      stringResponse <- service.crawlString("https://www.cnn.com/")
+      _ = println(crawlResponse1)
+
+      crawlStringResponse1 <- service.crawlString(
+        "https://www.cnn.com/",
+        CrawlSourceType.url,
+      )
+
+      _ = println(crawlStringResponse1)
+
+      crawlResponse2 <- service.crawl(
+        Source.fromFile(testHtmlFile).mkString,
+        CrawlSourceType.html,
+      )
+
+      _ = println(crawlResponse2)
+
+      crawlResponse3 <- service.crawl(
+        Source.fromFile(testPdfFile).mkString,
+        CrawlSourceType.pdf,
+      )
+
+      _ = println(crawlResponse3)
 
       segmentResponse <- service.segment(
         hamletContent,
