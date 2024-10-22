@@ -27,7 +27,8 @@ object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
     AzureFormRecognizerApiVersion.v2023_02_28_preview,
     AzureFormRecognizerApiVersion.v2023_07_31,
     AzureFormRecognizerApiVersion.v2023_10_31_preview,
-    AzureFormRecognizerApiVersion.v2024_02_29_preview
+    AzureFormRecognizerApiVersion.v2024_02_29_preview,
+    AzureFormRecognizerApiVersion.v2024_07_31_preview
   )
 
   private val showContent = false
