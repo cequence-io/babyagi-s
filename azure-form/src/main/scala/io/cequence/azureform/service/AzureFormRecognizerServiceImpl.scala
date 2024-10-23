@@ -6,7 +6,13 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import io.cequence.azureform.AzureFormRecognizerClientException
 import io.cequence.azureform.AzureFormats._
-import io.cequence.azureform.model.{AzureFormRecognizerAnalyzeSettings, AzureInvoiceResponse, AzureLayoutResponse, AzureReadResponse, HasStatus}
+import io.cequence.azureform.model.{
+  AzureFormRecognizerAnalyzeSettings,
+  AzureInvoiceResponse,
+  AzureLayoutResponse,
+  AzureReadResponse,
+  HasStatus
+}
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
 import io.cequence.wsclient.domain.{RichResponse, WsRequestContext}
 import io.cequence.wsclient.service.WSClientEngine
@@ -147,7 +153,9 @@ private class AzureFormRecognizerServiceImpl(
   private def paramsAux(settings: AzureFormRecognizerAnalyzeSettings) =
     Seq(
       AzureFormRecognizerParam.pages -> settings.pages,
-      AzureFormRecognizerParam.outputContentFormat -> settings.outputContentFormat.map(_.toString)
+      AzureFormRecognizerParam.outputContentFormat -> settings.outputContentFormat.map(
+        _.toString
+      )
     ) ++ settings.features.map(feat => AzureFormRecognizerParam.features -> Some(feat))
 
   override def analyzeRead(
@@ -279,8 +287,8 @@ private class AzureFormRecognizerServiceImpl(
   // aux/helper functions
 
   private def analyzeWithResultsAux[T <: HasStatus, IN](
-                                                         analyzeFun: (IN, String, AzureFormRecognizerAnalyzeSettings) => Future[String],
-                                                         analyzeResultsFun: (String, String) => Future[T]
+    analyzeFun: (IN, String, AzureFormRecognizerAnalyzeSettings) => Future[String],
+    analyzeResultsFun: (String, String) => Future[T]
   )(
     input: IN,
     modelId: String,
@@ -289,9 +297,12 @@ private class AzureFormRecognizerServiceImpl(
     for {
       resultId <- analyzeFun(input, modelId, settings)
 
-      result <- pollUntilDone(
-        analyzeResultsFun(resultId, modelId)
-      )
+      result <-
+        pollUntilDone[T](
+          _.status != "running"
+        )(
+          analyzeResultsFun(resultId, modelId)
+        )
     } yield result
 }
 

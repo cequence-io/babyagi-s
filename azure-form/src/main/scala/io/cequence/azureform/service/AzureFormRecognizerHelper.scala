@@ -2,10 +2,11 @@ package io.cequence.azureform.service
 
 import io.cequence.azureform.model._
 import org.slf4j.LoggerFactory
+import io.cequence.wsclient.service.PollingHelper
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait AzureFormRecognizerHelper extends PolygonHelper {
+trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
 
   object ReadModelDefaults {
     val linesPerPageForNewLineThreshold = 60
@@ -17,20 +18,6 @@ trait AzureFormRecognizerHelper extends PolygonHelper {
   private val logParagraphsReplacement = true
 
   private val logger = LoggerFactory.getLogger(this.getClass)
-
-  def pollUntilDone[T <: HasStatus](
-    call: => Future[T]
-  )(
-    implicit ec: ExecutionContext
-  ): Future[T] =
-    call.flatMap(result =>
-      result.status match {
-        case "running" =>
-          Thread.sleep(500) // TODO: use scheduler
-          pollUntilDone(call)
-        case _ => Future(result)
-      }
-    )
 
   protected def extractInvoiceEntities(
     invoiceAnalyzeResult: InvoiceAnalyzeResult
