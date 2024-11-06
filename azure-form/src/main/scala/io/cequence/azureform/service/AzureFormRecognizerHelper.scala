@@ -205,14 +205,20 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
 
   protected def pageContentToTextLines(
     pageContent: PageContent
-  ): Seq[String] = {
+  ): Seq[String] =
+    pageContentToTextLinesRich(pageContent).map(_._1)
+
+  // content + is section heading
+  protected def pageContentToTextLinesRich(
+    pageContent: PageContent
+  ): Seq[(String, Boolean)] = {
     val elsSorted = pageContent.elements
     pageContent.elements.zipWithIndex.flatMap { case (PageElementExt(element, box), index) =>
       val content = element match {
         case e: TableElement =>
-          Seq("") ++ e.content
+          ("", false) +: e.content.map((_, false))
         case e: TextElement =>
-          Seq(e.content)
+          Seq((e.content, e.isSectionHeading))
       }
 
       if (index > 0) {
@@ -223,7 +229,7 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
 
         // add a new line if a gap between lines is too big
         if (box.minY - prevLineBox.maxY > avgLineHeight) {
-          Seq("") ++ content
+          ("", false) +: content
         } else
           content
       } else
@@ -233,12 +239,17 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
 
   protected def pageContentToTextLinesSimple(
     pageContent: PageContent
-  ): Seq[String] = {
+  ): Seq[String] =
+    pageContentToTextLinesSimpleRich(pageContent).map(_._1)
+
+  protected def pageContentToTextLinesSimpleRich(
+    pageContent: PageContent
+  ): Seq[(String, Boolean)] = {
     val els = pageContent.elements
     els.zipWithIndex.flatMap { case (PageElementExt(el, boundingBox), index) =>
       el match {
         case e: TableElement =>
-          Seq("") ++ e.content
+          ("", false) +: e.content.map((_, false))
         case e: TextElement =>
           val yTop = boundingBox.minY
           val yBottom = boundingBox.maxY
@@ -256,11 +267,18 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
 
             // add a new line if a gap between lines is too big
             if (Math.abs(yTop - prevYBottom) > avgLineHeight)
-              Seq("", e.content)
+              Seq(
+                ("", false),
+                (e.content, e.isSectionHeading)
+              )
             else
-              Seq(e.content)
+              Seq(
+                (e.content, e.isSectionHeading)
+              )
           } else
-            Seq(e.content)
+            Seq(
+              (e.content, e.isSectionHeading)
+            )
       }
     }
   }
@@ -268,13 +286,19 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
   private def extractPageContentsAux(
     layoutResult: LayoutAnalyzeResult,
     tableInfos: Seq[TableInfoAux],
+    sectionStarts: Seq[SectionHeading],
     relaxedCentroidCheck: Boolean
   ): Seq[PageContent] =
     layoutResult.pages.zipWithIndex.map { case (page, pageIndex) =>
       val height = page.height
       val pageNumber = page.pageNumber
+
       val pageTableInfos = tableInfos.filter { tableInfo =>
         tableInfo.pageNumber == pageNumber
+      }
+
+      val pageSectionHeadings = sectionStarts.filter { sectionStart =>
+        sectionStart.pageNumber == pageNumber
       }
 
       val els = page.lines.zipWithIndex.flatMap { case (line, index) =>
@@ -296,8 +320,10 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
             } else
               None
           case None =>
+            val sectionStarts =
+              isSectionHeading(pageSectionHeadings, line, relaxedCentroidCheck)
             val bbox = polygonToBoundingBox(line.polygon)
-            Some((bbox, TextElement(line.content)))
+            Some((bbox, TextElement(line.content, sectionStarts)))
         }
       }
 
@@ -316,6 +342,7 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
   private def extractPageContentsSortedAux(
     layoutResult: LayoutAnalyzeResult,
     tableInfos: Seq[TableInfoAux],
+    sectionHeadings: Seq[SectionHeading],
     relaxedCentroidCheck: Boolean,
     compareCoorRelativeToPage: Boolean = false,
     minCoorDiffPercent: Double,
@@ -336,6 +363,7 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
     extractPageContentsSortedCustomAux(sort)(
       layoutResult,
       tableInfos,
+      sectionHeadings,
       relaxedCentroidCheck,
       addWords
     )
@@ -348,6 +376,7 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
   )(
     layoutResult: LayoutAnalyzeResult,
     tableInfos: Seq[TableInfoAux],
+    sectionHeadings: Seq[SectionHeading],
     relaxedCentroidCheck: Boolean,
     addWords: Boolean = false
   ): Seq[PageContent] =
@@ -356,8 +385,13 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
       val sortAux = sortByBoundingBox(page)
 
       val pageNumber = page.pageNumber
+
       val pageTableInfos = tableInfos.filter { tableInfo =>
         tableInfo.pageNumber == pageNumber
+      }
+
+      val pageSectionHeadings = sectionHeadings.filter { sectionStart =>
+        sectionStart.pageNumber == pageNumber
       }
 
       val remainingLines = page.lines.filterNot { line =>
@@ -379,7 +413,9 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
       }
 
       val elements2 = remainingLines.map { line =>
-        val el = TextElement(line.content)
+        val sectionHeadingFlag =
+          isSectionHeading(pageSectionHeadings, line, relaxedCentroidCheck)
+        val el = TextElement(line.content, sectionHeadingFlag)
         val bbox = polygonToBoundingBox(line.polygon)
         (bbox, el)
       }
@@ -390,7 +426,7 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
 
       val words = page.words.map { word =>
         val bbox = polygonToBoundingBox(word.polygon)
-        PageTextExt(TextElement(word.content), bbox)
+        PageTextExt(TextElement(word.content, isSectionHeading = false), bbox)
       }
 
       PageContent(
@@ -400,6 +436,18 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
         elements,
         words = if (addWords) words else Nil
       )
+    }
+
+  private def isSectionHeading(
+    pageSectionHeadings: Seq[SectionHeading],
+    line: Line,
+    relaxedCentroidCheck: Boolean
+  ) =
+    pageSectionHeadings.find { sectionStart =>
+      isPolygonInside(sectionStart.boundingPolygon, line.polygon, relaxedCentroidCheck)
+    } match {
+      case Some(_) => true
+      case None    => false
     }
 
   protected def extractEnhancedContent(
@@ -766,18 +814,38 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
 
     val filteredTableInfos = filterTables match {
       case Some(filter) => tableInfos.filter(filter)
-      case None => tableInfos
+      case None         => tableInfos
     }
+
+    val sectionHeadings = getSectionHeadings(layoutAnalyzeResult)
 
     extractPageContentsSortedAux(
       layoutAnalyzeResult,
       filteredTableInfos,
+      sectionHeadings,
       relaxedCentroidCheck,
       compareCoorRelativeToPage,
       minCoorDiffPercent,
       addWords
     )
   }
+
+  private def getSectionHeadings(
+    layoutAnalyzeResult: LayoutAnalyzeResult
+  ) =
+    layoutAnalyzeResult.paragraphs.flatMap { par =>
+      if (par.role.contains(ParagraphRole.sectionHeading)) {
+        val boundingRegion = par.boundingRegions.head
+        Some(
+          SectionHeading(
+            par.content,
+            boundingRegion.pageNumber,
+            boundingRegion.polygon
+          )
+        )
+      } else
+        None
+    }
 
   protected def extractPageContents(
     layoutAnalyzeResult: LayoutAnalyzeResult,
@@ -793,10 +861,17 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
 
     val filteredTableInfos = filterTables match {
       case Some(filter) => tableInfos.filter(filter)
-      case None => tableInfos
+      case None         => tableInfos
     }
 
-    extractPageContentsAux(layoutAnalyzeResult, filteredTableInfos, relaxedCentroidCheck)
+    val sectionHeadings = getSectionHeadings(layoutAnalyzeResult)
+
+    extractPageContentsAux(
+      layoutAnalyzeResult,
+      filteredTableInfos,
+      sectionHeadings,
+      relaxedCentroidCheck
+    )
   }
 
   protected def extractTableInfos(
@@ -808,11 +883,10 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
     layoutAnalyzeResult.tables.zipWithIndex.flatMap { case (table, tableIndex) =>
       val boundingRegion = table.boundingRegions.head
       val pageNumber = boundingRegion.pageNumber
-      val page = pageNumberMap
-        .get(pageNumber)
-        .getOrElse(
-          throw new IllegalArgumentException(s"Page ${pageNumber} not found")
-        )
+      val page = pageNumberMap.getOrElse(
+        pageNumber,
+        throw new IllegalArgumentException(s"Page ${pageNumber} not found")
+      )
 
       val tableLines = findTableLines(layoutAnalyzeResult, table, relaxedCentroidCheck)
 
@@ -988,5 +1062,11 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
     columnCount: Int,
     minLineIndex: Int,
     newLines: Seq[String]
+  )
+
+  protected case class SectionHeading(
+    text: String,
+    pageNumber: Int,
+    boundingPolygon: Seq[Double]
   )
 }

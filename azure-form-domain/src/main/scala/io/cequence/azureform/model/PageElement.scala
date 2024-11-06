@@ -5,7 +5,8 @@ trait PageElement {
 }
 
 case class TextElement(
-  content: String
+  content: String,
+  isSectionHeading: Boolean
 ) extends PageElement {
   override def contentString = content
 }
