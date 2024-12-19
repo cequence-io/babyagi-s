@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext
 
 class AzurePlayWSClientEngine(
   override val coreUrl: String,
-  override protected val requestContext: WsRequestContext,
+  override protected[service] val requestContext: WsRequestContext,
   override protected val recoverErrors: String => PartialFunction[Throwable, RichResponse]
 )(
   override protected implicit val materializer: Materializer,
@@ -92,7 +92,7 @@ object AzurePlayWSClientEngine {
 
   private final class AzurePlayWSClientEngineImpl(
     endPoint: String,
-    override protected val requestContext: WsRequestContext,
+    override protected[service] val requestContext: WsRequestContext,
     override protected val recoverErrors: String => PartialFunction[Throwable, RichResponse] =
       defaultRecoverErrors
   )(
