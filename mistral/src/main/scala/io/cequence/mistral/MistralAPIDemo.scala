@@ -5,7 +5,6 @@ import akka.stream.{ActorMaterializer, Materializer}
 import io.cequence.mistral.model._
 import io.cequence.mistral.service.{MistralOCRModel, MistralServiceFactory}
 
-import java.io.File
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object MistralAPIDemo extends App {
@@ -19,7 +18,7 @@ object MistralAPIDemo extends App {
   {
     for {
       ocrResponse <- service.uploadWithOCR(
-        new File(new java.io.File(testPdfFileName)),
+        new java.io.File(testPdfFileName),
         settings = OCRSettings(
           model = MistralOCRModel.mistral_ocr_2503,
           includeImageBase64 = Some(false)
