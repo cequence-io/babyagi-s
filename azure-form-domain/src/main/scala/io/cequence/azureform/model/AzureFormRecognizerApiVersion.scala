@@ -1,6 +1,7 @@
 package io.cequence.azureform.model
 
 object AzureFormRecognizerApiVersion {
+  val v2024_11_30 = "2024-11-30"
   val v2024_07_31_preview = "2024-07-31-preview" // v4.0
   val v2024_02_29_preview = "2024-02-29-preview" // v4.0
   val v2023_10_31_preview = "2023-10-31-preview" // v4.0

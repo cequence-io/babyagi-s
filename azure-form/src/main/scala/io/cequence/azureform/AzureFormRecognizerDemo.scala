@@ -23,20 +23,21 @@ object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
   private val fileName = System.getenv("AZURE_TEST_FILE_NAME")
 
   private val versions = Seq(
-    AzureFormRecognizerApiVersion.v2022_08_31,
-    AzureFormRecognizerApiVersion.v2023_02_28_preview,
-    AzureFormRecognizerApiVersion.v2023_07_31,
-    AzureFormRecognizerApiVersion.v2023_10_31_preview,
-    AzureFormRecognizerApiVersion.v2024_02_29_preview,
-    AzureFormRecognizerApiVersion.v2024_07_31_preview
+//    AzureFormRecognizerApiVersion.v2022_08_31,
+//    AzureFormRecognizerApiVersion.v2023_02_28_preview,
+//    AzureFormRecognizerApiVersion.v2023_07_31,
+//    AzureFormRecognizerApiVersion.v2023_10_31_preview,
+//    AzureFormRecognizerApiVersion.v2024_02_29_preview,
+//    AzureFormRecognizerApiVersion.v2024_07_31_preview,
+    AzureFormRecognizerApiVersion.v2024_11_30
   )
 
-  private val showContent = false
+  private val showContent = true
 
   private val settings = AzureFormRecognizerAnalyzeSettings(
-    pages = Some("1-2"),
+//    pages = Some("1-2"),
 //    features = Seq("languages"), // "styleFont",
-//    outputContentFormat = Some(ContentFormat.markdown)
+    outputContentFormat = Some(ContentFormat.markdown)
   )
 
   // run for given versions
@@ -110,6 +111,9 @@ object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
 
         if (showContent)
           println(s"Content:\n${layoutResultSection.content}")
+
+        if (showContent)
+          println(s"Content (lines):\n${layoutResultSection.pages.map(_.lines.map(_.content).mkString("\n")).mkString("\n---PAGE BREAK---\n")}")
 
         println
         service.close()
