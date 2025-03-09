@@ -1,5 +1,5 @@
 # BabyAGI - Scala Port and Beyond
-[![version](https://img.shields.io/badge/version-0.1.16-green.svg)](https://cequence.io) [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/licenses/MIT)
+[![version](https://img.shields.io/badge/version-0.1.17-green.svg)](https://cequence.io) [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/licenses/MIT)
 
 This project provides a line-by-line port of [BabyAGI](https://github.com/yoheinakajima/babyagi) - the first prototype of LLM-driven AI agent - in Scala to serve as a starting point for further explorations and customizations in Scala or any other JVM language. This means we haven't aimed to optimize or refactor anything besides a few parts where a direct mapping from Python to Scala code wasn't possible. To validate consistency with the original Python version we also provide two test suites for [prompts](babyagi-s-port/src/test/scala/io/cequence/babyagis/port/BabyAGIPromptSpec.scala) and [the task storage](babyagi-s-port/src/test/scala/io/cequence/babyagis/port/BabyAGITaskStorageSpec.scala).
 
