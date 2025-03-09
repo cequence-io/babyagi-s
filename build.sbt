@@ -28,11 +28,18 @@ lazy val cohere_client =
     .aggregate(cohere_client_domain, azure_form)
     .dependsOn(cohere_client_domain)
 
+lazy val mistral_client_domain = (project in file("mistral-domain"))
+
+lazy val mistral_client =
+  (project in file("mistral"))
+    .aggregate(mistral_client_domain, cohere_client)
+    .dependsOn(mistral_client_domain)
+
 lazy val jina_client_domain = (project in file("jina-domain"))
 
 lazy val jina_client =
   (project in file("jina"))
-    .aggregate(jina_client_domain, cohere_client)
+    .aggregate(jina_client_domain, mistral_client)
     .dependsOn(jina_client_domain)
 
 
