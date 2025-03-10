@@ -5,3 +5,7 @@ target
 /.idea_modules
 /.classpath
 /.project
+/.vscode
+/.metals
+.bloop
+/.bsp
