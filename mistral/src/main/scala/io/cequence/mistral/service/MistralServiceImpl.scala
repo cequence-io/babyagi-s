@@ -9,7 +9,7 @@ import io.cequence.wsclient.service.WSClientEngine
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
 import io.cequence.wsclient.service.ws.PlayWSClientEngine
 import io.cequence.mistral.model.Document.DocumentURLChunk
-import io.cequence.mistral.model.{Document, FileDeleteResponse, FileListResponse, FileUploadResponse, OCRResponse, OCRSettings}
+import io.cequence.mistral.model._
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Format.GenericFormat
 import play.api.libs.json.{JsObject, Json}
@@ -60,13 +60,16 @@ private class MistralServiceImpl(
   override def ocr(
     document: Document,
     settings: OCRSettings
-  ): Future[OCRResponse] =
+  ): Future[OCRResponse] = {
+    val documentJson = Json.toJson(document)(documentFormat)
+
     execPOSTBody(
       Endpoint.ocr,
-      body = Json.toJsObject(settings) ++ Json.obj("document" -> Json.toJson(document))
+      body = Json.toJsObject(settings) ++ Json.obj("document" -> documentJson)
     ).map(
-      _.asSafeJson[OCRResponse]
+      _.asSafeJson[OCRResponse](ocrResponseFormat)
     )
+  }
 
   override def uploadFile(
     file: File,
@@ -77,7 +80,7 @@ private class MistralServiceImpl(
       fileParams = Seq(("file", file, None)),
       bodyParams = Seq("purpose" -> purpose)
     ).map(
-      _.asSafeJson[FileUploadResponse]
+      _.asSafeJson[FileUploadResponse](fileUploadResponseFormat)
     )
 
   override def signFileURL(
@@ -110,8 +113,8 @@ private class MistralServiceImpl(
     execGET(
       endPoint = Endpoint.files,
       params = Seq(
-//        "page" -> Some(page),
-//        "page_size" -> Some(pageSize)
+        "page" -> page,
+        "page_size" -> pageSize
       )
     ).map(
       _.asSafeJson[FileListResponse](fileListResponseFormat)
@@ -136,7 +139,7 @@ private class MistralServiceImpl(
         expiryHours = 1
       )
 
-      _ = logger.info(s"debug ${fileResponse.filename} signed with URL ${signedURL}")
+      _ = logger.debug(s"${fileResponse.filename} signed with URL ${signedURL}")
 
       ocrResponse <- ocr(
         document = DocumentURLChunk(
@@ -148,7 +151,9 @@ private class MistralServiceImpl(
 
       deleteResponse <- deleteFile(fileResponse.id)
     } yield {
-      logger.info(s"OCR response with ${ocrResponse.pages.size} pages for file ${fileResponse.filename} obtained in ${new java.util.Date().getTime - start} ms.")
+      logger.info(
+        s"OCR response with ${ocrResponse.pages.size} pages for file ${fileResponse.filename} obtained in ${new java.util.Date().getTime - start} ms."
+      )
 
       if (!deleteResponse.deleted)
         logger.warn(s"File ${fileResponse.filename} was not deleted from Mistral API.")

@@ -17,6 +17,8 @@ object MistralAPIDemo extends App {
 
   {
     for {
+      files <- service.listFiles(Some(0), Some(100))
+
       ocrResponse <- service.uploadWithOCR(
         new java.io.File(testPdfFileName),
         settings = OCRSettings(
@@ -25,6 +27,7 @@ object MistralAPIDemo extends App {
         )
       )
     } yield {
+      println(files.total)
       println(ocrResponse.pages.map(_.markdown).mkString("\n---PAGE BREAK---\n"))
       service.close()
       System.exit(0)
