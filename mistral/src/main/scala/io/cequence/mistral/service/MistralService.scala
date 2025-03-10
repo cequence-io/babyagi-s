@@ -1,5 +1,7 @@
 package io.cequence.mistral.service
 
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import io.cequence.mistral.model.{Document, FileDeleteResponse, FileListResponse, FileUploadResponse, OCRResponse, OCRSettings}
 import io.cequence.wsclient.service.CloseableService
 
@@ -13,14 +15,22 @@ trait MistralService extends MistralConsts with CloseableService {
     settings: OCRSettings = Defaults.OCR
   ): Future[OCRResponse]
 
-  def uploadWithOCR(
-    file: java.io.File,
-    settings: OCRSettings = Defaults.OCR
+  def ocrWithPages(
+    document: Document,
+    settings: OCRSettings = Defaults.OCR,
+    pageIntervals: Seq[(Int, Int)]
   ): Future[OCRResponse]
 
   def uploadFile(
     file: java.io.File,
-    purpose: Option[String]
+    purpose: Option[String],
+    fileName: Option[String] = None
+  ): Future[FileUploadResponse]
+
+  def uploadSource(
+    source: Source[ByteString, _],
+    purpose: Option[String],
+    fileName: Option[String] = None
   ): Future[FileUploadResponse]
 
   def deleteFile(
@@ -36,4 +46,18 @@ trait MistralService extends MistralConsts with CloseableService {
     fileId: UUID,
     expiryHours: Int
   ): Future[String]
+
+  def uploadWithOCR(
+    file: java.io.File,
+    settings: OCRSettings = Defaults.OCR,
+    pageIntervals: Seq[(Int, Int)] = Nil,
+    fileName: Option[String] = None
+  ): Future[OCRResponse]
+
+  def uploadSourceWithOCR(
+    source: Source[ByteString, _],
+    settings: OCRSettings = Defaults.OCR,
+    pageIntervals: Seq[(Int, Int)] = Nil,
+    fileName: Option[String] = None
+  ): Future[OCRResponse]
 }
