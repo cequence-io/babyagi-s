@@ -7,7 +7,7 @@ import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
 import io.cequence.wsclient.domain.WsRequestContext
 import io.cequence.wsclient.service.WSClientEngine
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
-import io.cequence.wsclient.service.ws.PlayWSClientEngine
+import io.cequence.wsclient.service.ws.{PlayWSClientEngine, Timeouts}
 import io.cequence.mistral.model.Document.DocumentURLChunk
 import io.cequence.mistral.model._
 import org.slf4j.LoggerFactory
@@ -21,10 +21,12 @@ import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future}
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+
 import java.nio.file.{Files, StandardOpenOption}
 
 private class MistralServiceImpl(
-  apiKey: String
+  apiKey: String,
+  timeouts: Option[Timeouts] = None
 )(
   implicit val ec: ExecutionContext,
   val materializer: Materializer
@@ -39,6 +41,7 @@ private class MistralServiceImpl(
   override protected val engine: WSClientEngine = PlayWSClientEngine(
     coreUrl = "https://api.mistral.ai/v1/",
     requestContext = WsRequestContext(
+      explTimeouts = timeouts,
       authHeaders = Seq(("Authorization", s"Bearer $apiKey"))
     ),
     recoverErrors = { (serviceEndPointName: String) =>
@@ -287,19 +290,21 @@ object MistralServiceFactory {
   private val envAPIKey = "MISTRAL_API_KEY"
 
   def apply(
+    timeouts: Option[Timeouts] = None
   )(
     implicit ec: ExecutionContext,
     materializer: Materializer
   ): MistralService =
-    apply(getAPIKeyFromEnv())
+    apply(getAPIKeyFromEnv(), timeouts)
 
   def apply(
-    apiKey: String
+    apiKey: String,
+    timeouts: Option[Timeouts]
   )(
     implicit ec: ExecutionContext,
     materializer: Materializer
   ): MistralService =
-    new MistralServiceImpl(apiKey)
+    new MistralServiceImpl(apiKey, timeouts)
 
   private def getAPIKeyFromEnv(): String =
     Option(System.getenv(envAPIKey)).getOrElse(

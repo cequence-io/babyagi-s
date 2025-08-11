@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
 import io.cequence.mistral.model._
 import io.cequence.mistral.service.{MistralOCRModel, MistralServiceFactory}
+import io.cequence.wsclient.service.ws.Timeouts
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -11,7 +12,14 @@ object MistralAPIDemo extends App {
   private implicit val actorSystem: ActorSystem = ActorSystem()
   private implicit val materializer: Materializer = ActorMaterializer()
 
-  private val service = MistralServiceFactory()
+  private val service = MistralServiceFactory(
+    timeouts = Some(
+      Timeouts(
+        requestTimeout = Some(300000),
+        readTimeout = Some(300000)
+      )
+    )
+  )
 
   private val testPdfFileName = System.getenv("MISTRAL_TEST_FILE_NAME")
 
@@ -26,6 +34,8 @@ object MistralAPIDemo extends App {
   {
     for {
       files <- service.listFiles(Some(0), Some(100))
+
+      _ = println(s"Total files ${files.total}: ${files.data.map(_.filename).mkString(",")}")
 
       ocrResponse1 <- doAux(Nil)
 
