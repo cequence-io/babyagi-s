@@ -51,7 +51,7 @@ object CohereAPIDemo extends App {
           )
         ),
         settings = RerankSettings(
-          model = RerankModelId.rerank_english_v3_0,
+          model = RerankModelId.rerank_v3_5,
           top_n = Some(3),
           return_documents = Some(true)
         )
