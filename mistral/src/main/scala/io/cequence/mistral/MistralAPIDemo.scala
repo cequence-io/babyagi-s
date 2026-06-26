@@ -6,7 +6,9 @@ import io.cequence.mistral.model._
 import io.cequence.mistral.service.{MistralOCRModel, MistralServiceFactory}
 import io.cequence.wsclient.service.ws.Timeouts
 
+import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object MistralAPIDemo extends App {
   private implicit val actorSystem: ActorSystem = ActorSystem()
@@ -37,14 +39,20 @@ object MistralAPIDemo extends App {
 
       _ = println(s"Total files ${files.total}: ${files.data.map(_.filename).mkString(",")}")
 
+      _ <- Future.sequence(
+        files.data.map { fileInfo =>
+          service.deleteFile(UUID.fromString(fileInfo.id))
+        }
+      )
+
+      _ = println(s"Total files after delete ${files.total}: ${files.data.map(_.filename).mkString(",")}")
+
       ocrResponse1 <- doAux(Nil)
 
       ocrResponse2 <- doAux(Seq((0, pageCount / 2), (pageCount / 2 + 1, pageCount - 1)))
 
       ocrResponse3 <- doAux((0 to pageCount - 1).map(i => (i,i)))
     } yield {
-      println(s"Total files ${files.total}: ${files.data.map(_.filename).mkString(",")}")
-
       val content1 = ocrResponse1.pages.map(_.markdown).mkString("")
       val content2 = ocrResponse2.pages.map(_.markdown).mkString("")
       val content3 = ocrResponse3.pages.map(_.markdown).mkString("")

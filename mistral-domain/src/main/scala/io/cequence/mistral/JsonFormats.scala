@@ -1,6 +1,6 @@
 package io.cequence.mistral
 
-import io.cequence.mistral.model.{Document, FileDeleteResponse, FileInfo, FileListResponse, FileUploadResponse, OCRImage, OCRPage, OCRPageDimensions, OCRResponse, OCRSettings, OCRUsageInfo}
+import io.cequence.mistral.model.{Document, FileDeleteResponse, FileInfo, FileListResponse, FileUploadResponse, OCRBlock, OCRConfidenceScore, OCRImage, OCRPage, OCRPageConfidenceScores, OCRPageDimensions, OCRResponse, OCRSettings, OCRTable, OCRUsageInfo}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import play.api.libs.json.JsonNaming.SnakeCase
@@ -39,8 +39,17 @@ object JsonFormats {
     Format(reads, writes)
   }
 
-  implicit lazy val ocrResponseFormat: Format[OCRResponse] =
-    Json.format[OCRResponse]
+  implicit lazy val ocrConfidenceScoreFormat: Format[OCRConfidenceScore] =
+    Json.format[OCRConfidenceScore]
+
+  implicit lazy val ocrPageConfidenceScoresFormat: Format[OCRPageConfidenceScores] =
+    Json.format[OCRPageConfidenceScores]
+
+  implicit lazy val ocrTableFormat: Format[OCRTable] =
+    Json.format[OCRTable]
+
+  implicit lazy val ocrBlockFormat: Format[OCRBlock] =
+    Json.format[OCRBlock]
 
   implicit lazy val ocrImageFormat: Format[OCRImage] =
     Json.format[OCRImage]
@@ -53,6 +62,9 @@ object JsonFormats {
 
   implicit lazy val ocrPageFormat: Format[OCRPage] =
     Json.format[OCRPage]
+
+  implicit lazy val ocrResponseFormat: Format[OCRResponse] =
+    Json.format[OCRResponse]
 
   implicit lazy val fileUploadResponseFormat: Format[FileUploadResponse] =
     Json.format[FileUploadResponse]

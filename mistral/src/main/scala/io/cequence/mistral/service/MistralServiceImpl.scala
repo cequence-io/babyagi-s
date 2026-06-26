@@ -114,7 +114,8 @@ private class MistralServiceImpl(
             usageInfo = OCRUsageInfo(
               pagesProcessed = accUsageInfo.pagesProcessed + responseUsageInfo.pagesProcessed,
               docSizeBytes = Some(accUsageInfo.docSizeBytes.getOrElse(0) + responseUsageInfo.docSizeBytes.getOrElse(0))
-            )
+            ),
+            documentAnnotation = acc.documentAnnotation.orElse(response.documentAnnotation)
           )
         }.getOrElse(
           throw new IllegalStateException("At least one OCR response expected")
@@ -130,7 +131,8 @@ private class MistralServiceImpl(
     execPOSTMultipart(
       Endpoint.files,
       fileParams = Seq(("file", file, fileName)),
-      bodyParams = Seq("purpose" -> purpose)
+      bodyParams = Seq("purpose" -> purpose),
+      useInMemoryBody = true
     ).map(
       _.asSafeJson[FileUploadResponse](fileUploadResponseFormat)
     )
