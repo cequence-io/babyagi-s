@@ -1,18 +1,19 @@
 package io.cequence.mistral.service
 
+import akka.actor.Scheduler
 import akka.stream.Materializer
 import io.cequence.mistral.JsonFormats._
-import io.cequence.mistral.{MistralClientTimeoutException, MistralClientUnknownHostException}
+import io.cequence.mistral.{MistralClientException, MistralClientTimeoutException, MistralClientUnknownHostException}
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
 import io.cequence.wsclient.domain.WsRequestContext
-import io.cequence.wsclient.service.WSClientEngine
+import io.cequence.wsclient.service.{PollingHelper, WSClientEngine}
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
 import io.cequence.wsclient.service.ws.{PlayWSClientEngine, Timeouts}
 import io.cequence.mistral.model.Document.DocumentURLChunk
 import io.cequence.mistral.model._
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Format.GenericFormat
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsNull, JsObject, Json}
 
 import java.io.File
 import java.net.UnknownHostException
@@ -26,15 +27,21 @@ import java.nio.file.{Files, StandardOpenOption}
 
 private class MistralServiceImpl(
   apiKey: String,
-  timeouts: Option[Timeouts] = None
+  timeouts: Option[Timeouts] = None,
+  batchPollingIntervalMs: Int = 5000
 )(
   implicit val ec: ExecutionContext,
   val materializer: Materializer
 ) extends MistralService
-    with WSClientWithEngine {
+    with WSClientWithEngine
+    with PollingHelper {
 
   override protected type PEP = String
   override protected type PT = String
+
+  override protected val pollingMs = batchPollingIntervalMs
+
+  private implicit lazy val scheduler: Scheduler = materializer.system.scheduler
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -61,6 +68,7 @@ private class MistralServiceImpl(
   object Endpoint {
     val ocr = "ocr"
     val files = "files"
+    val batchJobs = "batch/jobs"
   }
 
   override def ocr(
@@ -202,6 +210,14 @@ private class MistralServiceImpl(
       _.asSafeJson[FileListResponse](fileListResponseFormat)
     )
 
+  override def downloadFileContent(
+    fileId: UUID
+  ): Future[String] =
+    execGET(
+      endPoint = Endpoint.files,
+      endPointParam = Some(fileId.toString + "/content")
+    ).map(_.string)
+
   override def uploadWithOCR(
     file: java.io.File,
     settings: OCRSettings,
@@ -285,6 +301,214 @@ private class MistralServiceImpl(
       ocrResponse
     }
   }
+
+  override def createBatchJob(
+    endpoint: String,
+    inputFileId: UUID,
+    model: Option[String],
+    metadata: Map[String, String],
+    timeoutHours: Option[Int]
+  ): Future[BatchJob] = {
+    val request = BatchJobRequest(
+      endpoint = endpoint,
+      model = model,
+      inputFiles = Some(Seq(inputFileId.toString)),
+      metadata = if (metadata.isEmpty) None else Some(metadata),
+      timeoutHours = timeoutHours
+    )
+
+    execPOSTBody(
+      Endpoint.batchJobs,
+      body = Json.toJsObject(request)(batchJobRequestFormat)
+    ).map(
+      _.asSafeJson[BatchJob](batchJobFormat)
+    )
+  }
+
+  override def getBatchJob(
+    jobId: String
+  ): Future[BatchJob] =
+    execGET(
+      endPoint = Endpoint.batchJobs,
+      endPointParam = Some(jobId)
+    ).map(
+      _.asSafeJson[BatchJob](batchJobFormat)
+    )
+
+  override def listBatchJobs(
+    page: Option[Int],
+    pageSize: Option[Int],
+    createdByMe: Option[Boolean]
+  ): Future[BatchJobList] =
+    execGET(
+      endPoint = Endpoint.batchJobs,
+      params = Seq(
+        "page" -> page,
+        "page_size" -> pageSize,
+        "created_by_me" -> createdByMe
+      )
+    ).map(
+      _.asSafeJson[BatchJobList](batchJobListFormat)
+    )
+
+  override def cancelBatchJob(
+    jobId: String
+  ): Future[BatchJob] =
+    execPOST(
+      endPoint = Endpoint.batchJobs,
+      endPointParam = Some(s"$jobId/cancel")
+    ).map(
+      _.asSafeJson[BatchJob](batchJobFormat)
+    )
+
+  override def awaitBatchJob(
+    jobId: String
+  ): Future[BatchJob] =
+    pollUntilDone[BatchJob](
+      job => BatchJobStatus.terminal.contains(job.status)
+    )(
+      getBatchJob(jobId)
+    )
+
+  override def ocrBatch(
+    items: Seq[OCRBatchItem],
+    settings: OCRSettings,
+    metadata: Map[String, String],
+    timeoutHours: Option[Int]
+  ): Future[BatchJob] =
+    if (items.isEmpty) {
+      Future.failed(new MistralClientException("At least one OCR batch item expected."))
+    } else {
+      val jsonLines = items.map { item =>
+        val itemSettings = item.settings.getOrElse(settings)
+        val documentJson = Json.toJson(item.document)(documentFormat)
+        val body = Json.toJsObject(itemSettings) ++ Json.obj("document" -> documentJson)
+
+        Json.stringify(
+          Json.obj(
+            "custom_id" -> item.customId,
+            "body" -> body
+          )
+        )
+      }
+
+      val jsonlContent = ByteString(jsonLines.mkString("\n"))
+
+      for {
+        fileResponse <- uploadSource(
+          source = Source.single(jsonlContent),
+          purpose = Some("batch"),
+          fileName = Some(s"ocr-batch-${UUID.randomUUID()}.jsonl")
+        )
+
+        _ = logger.debug(
+          s"OCR batch input with ${items.size} items uploaded as ${fileResponse.filename} (${fileResponse.id})."
+        )
+
+        batchJob <- createBatchJob(
+          endpoint = BatchEndpoint.ocr,
+          inputFileId = fileResponse.id,
+          model = Some(settings.model),
+          metadata = metadata,
+          timeoutHours = timeoutHours
+        )
+      } yield batchJob
+    }
+
+  override def ocrBatchResults(
+    job: BatchJob
+  ): Future[Seq[OCRBatchItemResult]] =
+    job.outputFile match {
+      case None =>
+        Future.failed(
+          new MistralClientException(
+            s"OCR batch job ${job.id} (status: ${job.status}) has no output file."
+          )
+        )
+
+      case Some(outputFileId) =>
+        downloadFileContent(UUID.fromString(outputFileId)).map { content =>
+          content
+            .split("\n")
+            .filter(_.trim.nonEmpty)
+            .map { line =>
+              val json = Json.parse(line)
+              val customId = (json \ "custom_id").as[String]
+              val errorJson = (json \ "error").toOption.filterNot(_ == JsNull)
+
+              errorJson match {
+                case Some(error) =>
+                  OCRBatchItemResult(customId, errorMessage = Some(Json.stringify(error)))
+
+                case None =>
+                  val ocrResponse =
+                    (json \ "response" \ "body").as[OCRResponse](ocrResponseFormat)
+                  OCRBatchItemResult(customId, ocrResponse = Some(ocrResponse))
+              }
+            }
+            .toSeq
+        }
+    }
+
+  override def uploadWithOCRBatch(
+    files: Seq[(String, File)],
+    settings: OCRSettings,
+    metadata: Map[String, String],
+    signedUrlExpiryHours: Int
+  ): Future[Seq[OCRBatchItemResult]] =
+    for {
+      fileResponses <- Future.sequence(
+        files.map { case (customId, file) =>
+          uploadFile(file, purpose = Some("ocr"), fileName = None).map(customId -> _)
+        }
+      )
+
+      items <- Future.sequence(
+        fileResponses.map { case (customId, fileResponse) =>
+          signFileURL(fileResponse.id, expiryHours = signedUrlExpiryHours).map { signedURL =>
+            OCRBatchItem(
+              customId = customId,
+              document = Document.DocumentURLChunk(
+                documentUrl = signedURL,
+                documentName = fileResponse.filename
+              )
+            )
+          }
+        }
+      )
+
+      submittedJob <- ocrBatch(items, settings, metadata)
+
+      _ = logger.info(s"OCR batch job ${submittedJob.id} submitted with ${items.size} files.")
+
+      finishedJob <- awaitBatchJob(submittedJob.id)
+
+      results <-
+        if (finishedJob.status == BatchJobStatus.Success)
+          ocrBatchResults(finishedJob)
+        else
+          Future.failed(
+            new MistralClientException(
+              s"OCR batch job ${finishedJob.id} finished with status ${finishedJob.status}: " +
+                finishedJob.errors.map(_.message).mkString("; ")
+            )
+          )
+
+      cleanupFileIds =
+        (fileResponses.map(_._2.id) ++
+          finishedJob.inputFiles.map(UUID.fromString) ++
+          finishedJob.outputFile.map(UUID.fromString) ++
+          finishedJob.errorFile.map(UUID.fromString)).distinct
+
+      _ <- Future.sequence(
+        cleanupFileIds.map(id =>
+          deleteFile(id).recover { case e: Throwable =>
+            logger.warn(s"Failed to delete a batch-related file ${id}: ${e.getMessage}")
+            FileDeleteResponse(id.toString, deleted = false)
+          }
+        )
+      )
+    } yield results
 }
 
 object MistralServiceFactory {
@@ -292,12 +516,13 @@ object MistralServiceFactory {
   private val envAPIKey = "MISTRAL_API_KEY"
 
   def apply(
-    timeouts: Option[Timeouts] = None
+    timeouts: Option[Timeouts] = None,
+    batchPollingIntervalMs: Int = 5000
   )(
     implicit ec: ExecutionContext,
     materializer: Materializer
   ): MistralService =
-    apply(getAPIKeyFromEnv(), timeouts)
+    apply(getAPIKeyFromEnv(), timeouts, batchPollingIntervalMs)
 
   def apply(
     apiKey: String,
@@ -307,6 +532,16 @@ object MistralServiceFactory {
     materializer: Materializer
   ): MistralService =
     new MistralServiceImpl(apiKey, timeouts)
+
+  def apply(
+    apiKey: String,
+    timeouts: Option[Timeouts],
+    batchPollingIntervalMs: Int
+  )(
+    implicit ec: ExecutionContext,
+    materializer: Materializer
+  ): MistralService =
+    new MistralServiceImpl(apiKey, timeouts, batchPollingIntervalMs)
 
   private def getAPIKeyFromEnv(): String =
     Option(System.getenv(envAPIKey)).getOrElse(

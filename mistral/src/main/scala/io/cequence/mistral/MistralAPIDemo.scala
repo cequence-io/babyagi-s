@@ -52,6 +52,14 @@ object MistralAPIDemo extends App {
       ocrResponse2 <- doAux(Seq((0, pageCount / 2), (pageCount / 2 + 1, pageCount - 1)))
 
       ocrResponse3 <- doAux((0 to pageCount - 1).map(i => (i,i)))
+
+      // OCR at scale (via the async Batch API) is 50% cheaper than the sync endpoint used above
+      batchResults <- service.uploadWithOCRBatch(
+        Seq(
+          "doc-1" -> new java.io.File(testPdfFileName),
+          "doc-2" -> new java.io.File(testPdfFileName)
+        )
+      )
     } yield {
       val content1 = ocrResponse1.pages.map(_.markdown).mkString("")
       val content2 = ocrResponse2.pages.map(_.markdown).mkString("")
@@ -60,6 +68,15 @@ object MistralAPIDemo extends App {
       println(s"Pages: ${ocrResponse1.pages.size} - length: ${content1.length}")
       println(s"Pages: ${ocrResponse2.pages.size} - length: ${content2.length}")
       println(s"Pages: ${ocrResponse3.pages.size} - length: ${content3.length}")
+
+      batchResults.foreach { result =>
+        result.ocrResponse match {
+          case Some(ocrResponse) =>
+            println(s"Batch item ${result.customId}: ${ocrResponse.pages.size} pages")
+          case None =>
+            println(s"Batch item ${result.customId} failed: ${result.errorMessage.getOrElse("unknown error")}")
+        }
+      }
 
       service.close()
       System.exit(0)

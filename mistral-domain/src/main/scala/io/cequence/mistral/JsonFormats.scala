@@ -1,6 +1,6 @@
 package io.cequence.mistral
 
-import io.cequence.mistral.model.{Document, FileDeleteResponse, FileInfo, FileListResponse, FileUploadResponse, OCRBlock, OCRConfidenceScore, OCRImage, OCRPage, OCRPageConfidenceScores, OCRPageDimensions, OCRResponse, OCRSettings, OCRTable, OCRUsageInfo}
+import io.cequence.mistral.model.{BatchJob, BatchJobError, BatchJobList, BatchJobRequest, Document, FileDeleteResponse, FileInfo, FileListResponse, FileUploadResponse, OCRBlock, OCRConfidenceScore, OCRImage, OCRPage, OCRPageConfidenceScores, OCRPageDimensions, OCRResponse, OCRSettings, OCRTable, OCRUsageInfo}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import play.api.libs.json.JsonNaming.SnakeCase
@@ -76,4 +76,16 @@ object JsonFormats {
 
   implicit lazy val fileListResponseFormat: Format[FileListResponse] =
     Json.format[FileListResponse]
+
+  implicit lazy val batchJobRequestFormat: OFormat[BatchJobRequest] =
+    Json.format[BatchJobRequest]
+
+  implicit lazy val batchJobErrorFormat: Format[BatchJobError] =
+    Json.format[BatchJobError]
+
+  implicit lazy val batchJobFormat: Format[BatchJob] =
+    Json.format[BatchJob]
+
+  implicit lazy val batchJobListFormat: Format[BatchJobList] =
+    Json.format[BatchJobList]
 }
