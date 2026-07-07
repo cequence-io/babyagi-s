@@ -1,16 +1,10 @@
 package io.cequence.wsclient.service.ws
+
 import akka.stream.Materializer
 import io.cequence.azureform.model.AzureFormRecognizerApiVersion
-import io.cequence.azureform.{
-  AzureFormRecognizerClientException,
-  AzureFormRecognizerClientTimeoutException,
-  AzureFormRecognizerClientUnknownHostException
-}
-import io.cequence.wsclient.domain.{
-  RichResponse,
-  WsRequestContext
-}
-import io.cequence.wsclient.service.WSClientEngine
+import io.cequence.azureform.{AzureFormRecognizerClientException, AzureFormRecognizerClientTimeoutException, AzureFormRecognizerClientUnknownHostException}
+import io.cequence.wsclient.domain.{RichResponse, WsRequestContext}
+import io.cequence.wsclient.service.{WSClientEngine, WSClientInputStreamExtra}
 
 import java.net.UnknownHostException
 import java.util.concurrent.TimeoutException
@@ -87,7 +81,7 @@ object AzurePlayWSClientEngine {
   )(
     implicit materializer: Materializer,
     ec: ExecutionContext
-  ): WSClientEngine =
+  ): WSClientEngine with WSClientInputStreamExtra =
     new AzurePlayWSClientEngineImpl(coreUrl, requestContext, recoverErrors)
 
   private final class AzurePlayWSClientEngineImpl(

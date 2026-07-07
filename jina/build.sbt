@@ -5,7 +5,7 @@ name := "jina-client"
 description := "Client and utils for Jina AI API"
 
 libraryDependencies ++= Seq(
-  "io.cequence" %% "ws-client-core" % wsClient,
+  "io.cequence" %% "ws-client-core-akka" % wsClient,
   "io.cequence" %% "ws-client-play" % wsClient,
 
   "org.scalatest" %% "scalatest" % "3.2.15" % "test",

@@ -287,7 +287,8 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
     layoutResult: LayoutAnalyzeResult,
     tableInfos: Seq[TableInfoAux],
     sectionStarts: Seq[SectionHeading],
-    relaxedCentroidCheck: Boolean
+    relaxedCentroidCheck: Boolean,
+    addWords: Boolean = false
   ): Seq[PageContent] =
     layoutResult.pages.zipWithIndex.map { case (page, pageIndex) =>
       val height = page.height
@@ -331,11 +332,17 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
         PageElementExt(el, boundingBox)
       }
 
+      val words = page.words.map { word =>
+        val bbox = polygonToBoundingBox(word.polygon)
+        PageTextExt(TextElement(word.content, isSectionHeading = false), bbox)
+      }
+
       PageContent(
         pageNumber = pageIndex + 1, // starting from 1
         width = page.width,
         height = page.height,
-        elements
+        elements,
+        words = if (addWords) words else Nil
       )
     }
 
@@ -851,7 +858,8 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
     layoutAnalyzeResult: LayoutAnalyzeResult,
     relaxedCentroidCheck: Boolean = false,
     ignoreTables: Boolean = false,
-    filterTables: Option[TableInfoAux => Boolean] = None
+    filterTables: Option[TableInfoAux => Boolean] = None,
+    addWords: Boolean = false
   ): Seq[PageContent] = {
     val tableInfos =
       if (ignoreTables)
@@ -870,7 +878,8 @@ trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
       layoutAnalyzeResult,
       filteredTableInfos,
       sectionHeadings,
-      relaxedCentroidCheck
+      relaxedCentroidCheck,
+      addWords
     )
   }
 

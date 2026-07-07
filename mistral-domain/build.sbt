@@ -5,5 +5,5 @@ name := "mistral-client-domain"
 description := "Domain for Mistral API"
 
 libraryDependencies ++= Seq(
-  "io.cequence" %% "ws-client-core" % wsClient
+  "io.cequence" %% "ws-client-core-akka" % wsClient
 )

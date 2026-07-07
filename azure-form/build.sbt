@@ -5,7 +5,7 @@ name := "azure-form-recognizer"
 description := "Client and utils for Azure Form Recognizer"
 
 libraryDependencies ++= Seq(
-  "io.cequence" %% "ws-client-core" % wsClient,
+  "io.cequence" %% "ws-client-core-akka" % wsClient,
   "io.cequence" %% "ws-client-play" % wsClient,
   "org.kynosarges" % "tektosyne" % "6.2.0", // Polygon/geometry calculation
 

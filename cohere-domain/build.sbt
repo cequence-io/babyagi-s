@@ -5,5 +5,5 @@ name := "cohere-client-domain"
 description := "Domain for Cohere API"
 
 libraryDependencies ++= Seq(
-  "io.cequence" %% "ws-client-core" % wsClient
+  "io.cequence" %% "ws-client-core-akka" % wsClient
 )

@@ -6,16 +6,11 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import io.cequence.azureform.AzureFormRecognizerClientException
 import io.cequence.azureform.AzureFormats._
-import io.cequence.azureform.model.{
-  AzureFormRecognizerAnalyzeSettings,
-  AzureInvoiceResponse,
-  AzureLayoutResponse,
-  AzureReadResponse,
-  HasStatus
-}
+import io.cequence.azureform.model.{AzureFormRecognizerAnalyzeSettings, AzureInvoiceResponse, AzureLayoutResponse, AzureReadResponse, HasStatus}
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
 import io.cequence.wsclient.domain.{RichResponse, WsRequestContext}
-import io.cequence.wsclient.service.WSClientEngine
+import io.cequence.wsclient.service.WSClientWithEngineStreamTypes.WSClientWithInputStreamEngine
+import io.cequence.wsclient.service.{WSClientEngine, WSClientInputStreamExtra}
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
 import io.cequence.wsclient.service.ws.AzurePlayWSClientEngine
 import org.slf4j.LoggerFactory
@@ -32,15 +27,17 @@ private class AzureFormRecognizerServiceImpl(
   val materializer: Materializer,
   val actorSystem: ActorSystem
 ) extends AzureFormRecognizerService
-    with WSClientWithEngine
+    with WSClientWithInputStreamEngine
     with AzureFormRecognizerHelper {
+
+  private implicit lazy val scheduler = actorSystem.scheduler
 
   override protected type PEP = AzureFormRecognizerEndPoint
   override protected type PT = AzureFormRecognizerParam
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
-  override protected val engine: WSClientEngine = AzurePlayWSClientEngine(
+  override protected val engine: WSClientEngine with WSClientInputStreamExtra = AzurePlayWSClientEngine(
     endPoint,
     requestContext = WsRequestContext(
       authHeaders = Seq(
