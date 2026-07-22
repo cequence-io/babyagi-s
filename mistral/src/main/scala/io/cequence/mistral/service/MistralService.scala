@@ -121,4 +121,14 @@ trait MistralService extends MistralConsts with CloseableService {
     // URLs backing the input files must outlive that window
     signedUrlExpiryHours: Int = 25
   ): Future[Seq[OCRBatchItemResult]]
+
+  // same as uploadWithOCRBatch but accepts (customId, source) pairs instead of files
+  def uploadSourceWithOCRBatch(
+    sources: Seq[(String, Source[ByteString, _])],
+    settings: OCRSettings = Defaults.OCR,
+    metadata: Map[String, String] = Map.empty,
+    // batch jobs may take up to 24h (the max timeout_hours) to complete, so the signed
+    // URLs backing the input files must outlive that window
+    signedUrlExpiryHours: Int = 25
+  ): Future[Seq[OCRBatchItemResult]]
 }

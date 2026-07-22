@@ -502,13 +502,41 @@ private class MistralServiceImpl(
     metadata: Map[String, String],
     signedUrlExpiryHours: Int
   ): Future[Seq[OCRBatchItemResult]] =
-    for {
-      fileResponses <- Future.sequence(
+    Future
+      .sequence(
         files.map { case (customId, file) =>
           uploadFile(file, purpose = Some("ocr"), fileName = None).map(customId -> _)
         }
       )
+      .flatMap(
+        uploadWithOCRBatchAux(_, settings, metadata, signedUrlExpiryHours)
+      )
 
+  override def uploadSourceWithOCRBatch(
+    sources: Seq[(String, Source[ByteString, _])],
+    settings: OCRSettings,
+    metadata: Map[String, String],
+    signedUrlExpiryHours: Int
+  ): Future[Seq[OCRBatchItemResult]] =
+    Future
+      .sequence(
+        sources.map { case (customId, source) =>
+          uploadSource(source, purpose = Some("ocr"), fileName = None).map(customId -> _)
+        }
+      )
+      .flatMap(
+        uploadWithOCRBatchAux(_, settings, metadata, signedUrlExpiryHours)
+      )
+
+  // shared post-upload orchestration: sign URLs -> submit an OCR batch job -> await its
+  // completion -> parse the results -> delete all the intermediate files
+  private def uploadWithOCRBatchAux(
+    fileResponses: Seq[(String, FileUploadResponse)],
+    settings: OCRSettings,
+    metadata: Map[String, String],
+    signedUrlExpiryHours: Int
+  ): Future[Seq[OCRBatchItemResult]] =
+    for {
       items <- Future.sequence(
         fileResponses.map { case (customId, fileResponse) =>
           signFileURL(fileResponse.id, expiryHours = signedUrlExpiryHours).map { signedURL =>
