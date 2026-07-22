@@ -23,3 +23,11 @@ class MistralClientUnknownHostException(
 
   def this(message: String) = this(message, null)
 }
+
+class MistralClientNotFoundException(
+  message: String,
+  cause: Throwable
+) extends MistralClientException(message, cause) {
+
+  def this(message: String) = this(message, null)
+}

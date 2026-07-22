@@ -3,7 +3,7 @@ package io.cequence.mistral.service
 import akka.actor.Scheduler
 import akka.stream.Materializer
 import io.cequence.mistral.JsonFormats._
-import io.cequence.mistral.{MistralClientException, MistralClientTimeoutException, MistralClientUnknownHostException}
+import io.cequence.mistral.{MistralClientException, MistralClientNotFoundException, MistralClientTimeoutException, MistralClientUnknownHostException}
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
 import io.cequence.wsclient.domain.{
   CequenceWSTimeoutException,
@@ -25,6 +25,7 @@ import java.io.File
 import java.net.UnknownHostException
 import java.util.UUID
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -47,6 +48,9 @@ private class MistralServiceImpl(
   override protected type PT = String
 
   override protected val pollingMs = batchPollingIntervalMs
+
+  // how many not-found (404) poll responses are tolerated for a freshly submitted batch job
+  private val batchJobNotFoundMaxTolerated = 3
 
   private implicit lazy val scheduler: Scheduler = materializer.system.scheduler
 
@@ -77,6 +81,17 @@ private class MistralServiceImpl(
       }
     })
   )
+
+  override protected def handleErrorCodes(
+    httpCode: Int,
+    message: String
+  ): Nothing = {
+    val errorMessage = s"Code ${httpCode} : ${message}"
+    httpCode match {
+      case 404 => throw new MistralClientNotFoundException(errorMessage)
+      case _   => throw new MistralClientException(errorMessage)
+    }
+  }
 
   object Endpoint {
     val ocr = "ocr"
@@ -376,12 +391,30 @@ private class MistralServiceImpl(
 
   override def awaitBatchJob(
     jobId: String
-  ): Future[BatchJob] =
-    pollUntilDone[BatchJob](
-      job => BatchJobStatus.terminal.contains(job.status)
+  ): Future[BatchJob] = {
+    // Mistral's batch API is eventually consistent: a freshly created job can be invisible
+    // to GET for a short while, so a bounded number of not-found responses is treated as
+    // "still pending" rather than a failure
+    val notFoundBudget = new AtomicInteger(batchJobNotFoundMaxTolerated)
+
+    pollUntilDone[Option[BatchJob]](
+      _.exists(job => BatchJobStatus.terminal.contains(job.status))
     )(
-      getBatchJob(jobId)
+      getBatchJob(jobId).map(Some(_)).recover {
+        case _: MistralClientNotFoundException if notFoundBudget.getAndDecrement() > 0 =>
+          logger.warn(
+            s"Batch job ${jobId} not found - most likely not visible yet right after its creation. Retrying."
+          )
+          None
+      }
+    ).map(
+      _.getOrElse(
+        throw new MistralClientException(
+          s"Batch job ${jobId} polling completed without a job returned."
+        )
+      )
     )
+  }
 
   override def ocrBatch(
     items: Seq[OCRBatchItem],
