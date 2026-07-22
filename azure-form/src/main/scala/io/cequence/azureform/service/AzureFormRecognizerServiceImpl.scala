@@ -4,24 +4,27 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import io.cequence.azureform.AzureFormRecognizerClientException
+import io.cequence.azureform.{AzureFormRecognizerClientException, AzureFormRecognizerClientTimeoutException, AzureFormRecognizerClientUnknownHostException}
 import io.cequence.azureform.AzureFormats._
 import io.cequence.azureform.model.{AzureFormRecognizerAnalyzeSettings, AzureInvoiceResponse, AzureLayoutResponse, AzureReadResponse, HasStatus}
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
-import io.cequence.wsclient.domain.{RichResponse, WsRequestContext}
+import io.cequence.wsclient.domain.{CequenceWSTimeoutException, CequenceWSUnknownHostException, RichResponse, SiteBinding, WsRequestContext}
 import io.cequence.wsclient.service.WSClientWithEngineStreamTypes.WSClientWithInputStreamEngine
-import io.cequence.wsclient.service.{WSClientEngine, WSClientInputStreamExtra}
+import io.cequence.wsclient.service.{WSClientEngine, WSClientInputStreamExtraAkka}
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
 import io.cequence.wsclient.service.ws.AzurePlayWSClientEngine
 import org.slf4j.LoggerFactory
 
 import java.io.File
+import java.net.UnknownHostException
+import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future}
 
 private class AzureFormRecognizerServiceImpl(
   endPoint: String,
   apiKey: String,
-  apiVersion: String
+  apiVersion: String,
+  externalEngine: Option[WSClientEngine with WSClientInputStreamExtraAkka] = None
 )(
   implicit val ec: ExecutionContext,
   val materializer: Materializer,
@@ -37,8 +40,13 @@ private class AzureFormRecognizerServiceImpl(
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
-  override protected val engine: WSClientEngine with WSClientInputStreamExtra = AzurePlayWSClientEngine(
-    endPoint,
+  override protected val engine: WSClientEngine with WSClientInputStreamExtraAkka =
+    externalEngine.getOrElse(AzurePlayWSClientEngine())
+
+  override protected def ownsEngine: Boolean = externalEngine.isEmpty
+
+  override protected val site: SiteBinding = SiteBinding(
+    coreUrl = endPoint,
     requestContext = WsRequestContext(
       authHeaders = Seq(
         "Ocp-Apim-Subscription-Key" -> apiKey
@@ -48,7 +56,17 @@ private class AzureFormRecognizerServiceImpl(
           .toString() -> "analyzeDocument", // needed for >= v4.0
         AzureFormRecognizerParam.api_version.toString() -> apiVersion
       )
-    )
+    ),
+    recoverErrors = Some((serviceEndPointName: String) => {
+      case e @ (_: CequenceWSTimeoutException | _: TimeoutException) =>
+        throw new AzureFormRecognizerClientTimeoutException(
+          s"${serviceEndPointName} timed out: ${e.getMessage}."
+        )
+      case e @ (_: CequenceWSUnknownHostException | _: UnknownHostException) =>
+        throw new AzureFormRecognizerClientUnknownHostException(
+          s"${serviceEndPointName} cannot resolve a host name: ${e.getMessage}."
+        )
+    })
   )
 
   override def analyzeRemote(
@@ -314,4 +332,23 @@ object AzureFormRecognizerServiceFactory extends AzureFormRecognizerConsts {
     actorSystem: ActorSystem
   ): AzureFormRecognizerService =
     new AzureFormRecognizerServiceImpl(endPoint, apiKey, apiVersion)
+
+  /**
+   * Creates a service running on the given (shared, externally-owned) engine - no private HTTP
+   * transport is created. The engine must handle Azure's api-version-dependent URL scheme, i.e.
+   * be an [[io.cequence.wsclient.service.ws.AzurePlayWSClientEngine]] (one engine can be shared
+   * by any number of services/endpoints). The caller owns the engine and closes it - `close()`
+   * on the returned service is a no-op transport-wise.
+   */
+  def withEngine(
+    engine: WSClientEngine with WSClientInputStreamExtraAkka,
+    endPoint: String,
+    apiKey: String,
+    apiVersion: String = Defaults.version
+  )(
+    implicit ec: ExecutionContext,
+    materializer: Materializer,
+    actorSystem: ActorSystem
+  ): AzureFormRecognizerService =
+    new AzureFormRecognizerServiceImpl(endPoint, apiKey, apiVersion, Some(engine))
 }

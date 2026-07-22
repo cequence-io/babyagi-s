@@ -2,29 +2,34 @@ package io.cequence.wsclient.service.ws
 
 import akka.stream.Materializer
 import io.cequence.azureform.model.AzureFormRecognizerApiVersion
-import io.cequence.azureform.{AzureFormRecognizerClientException, AzureFormRecognizerClientTimeoutException, AzureFormRecognizerClientUnknownHostException}
-import io.cequence.wsclient.domain.{RichResponse, WsRequestContext}
-import io.cequence.wsclient.service.{WSClientEngine, WSClientInputStreamExtra}
+import io.cequence.azureform.AzureFormRecognizerClientException
+import io.cequence.wsclient.domain.SiteBinding
+import io.cequence.wsclient.service.{WSClientEngine, WSClientInputStreamExtraAkka}
+import io.cequence.wsclient.service.spi.TransportSettings
+import play.api.libs.ws.StandaloneWSRequest
 
-import java.net.UnknownHostException
-import java.util.concurrent.TimeoutException
 import scala.concurrent.ExecutionContext
 
+/**
+ * A CUSTOM Play WS engine subclass overriding `createURL` (Azure's api-version-dependent URL
+ * scheme). NOTE: deliberately NOT migrated to engine self-discovery (`WSClientEngineRegistry`)
+ * \- the discovery SPI creates stock engines, while this behavior lives in an engine subclass;
+ * making it backend-agnostic would require lifting the URL logic into the service layer.
+ */
 class AzurePlayWSClientEngine(
-  override val coreUrl: String,
-  override protected[service] val requestContext: WsRequestContext,
-  override protected val recoverErrors: String => PartialFunction[Throwable, RichResponse]
+  transportSettings: TransportSettings = TransportSettings()
 )(
-  override protected implicit val materializer: Materializer,
-  override protected implicit val ec: ExecutionContext
-) extends PlayWSClientEngine {
+  implicit materializer: Materializer,
+  ec: ExecutionContext
+) extends PlayWSClientEngine(transportSettings) {
 
   private object URLTargets {
     val formrecognizer = "formrecognizer"
     val documentintelligence = "documentintelligence"
   }
 
-  override def createURL(
+  private def createAzureURL(
+    coreUrl: String,
     endpoint: Option[String],
     value: Option[String] = None
   ): String = {
@@ -70,41 +75,30 @@ class AzurePlayWSClientEngine(
       throw new Exception("AzureFormRecognizerService: createURL: endPointParam is None")
     )
   }
+
+  override protected[ws] def getWSRequestOptional(
+    site: SiteBinding,
+    endPoint: Option[String],
+    endPointParam: Option[String],
+    params: Seq[(String, Option[Any])],
+    extraHeaders: Seq[(String, String)]
+  ): StandaloneWSRequest#Self =
+    super.getWSRequestOptional(
+      site.copy(coreUrl = createAzureURL(site.coreUrl, endPoint, endPointParam)),
+      endPoint = None,
+      endPointParam = None,
+      params,
+      extraHeaders
+    )
 }
 
 object AzurePlayWSClientEngine {
 
   def apply(
-    coreUrl: String,
-    requestContext: WsRequestContext = WsRequestContext(),
-    recoverErrors: String => PartialFunction[Throwable, RichResponse] = defaultRecoverErrors
+    transportSettings: TransportSettings = TransportSettings()
   )(
     implicit materializer: Materializer,
     ec: ExecutionContext
-  ): WSClientEngine with WSClientInputStreamExtra =
-    new AzurePlayWSClientEngineImpl(coreUrl, requestContext, recoverErrors)
-
-  private final class AzurePlayWSClientEngineImpl(
-    endPoint: String,
-    override protected[service] val requestContext: WsRequestContext,
-    override protected val recoverErrors: String => PartialFunction[Throwable, RichResponse] =
-      defaultRecoverErrors
-  )(
-    override protected implicit val materializer: Materializer,
-    override protected implicit val ec: ExecutionContext
-  ) extends AzurePlayWSClientEngine(endPoint, requestContext, recoverErrors)(materializer, ec)
-
-  private def defaultRecoverErrors: String => PartialFunction[Throwable, RichResponse] = {
-    (serviceEndPointName: String) =>
-      {
-        case e: TimeoutException =>
-          throw new AzureFormRecognizerClientTimeoutException(
-            s"${serviceEndPointName} timed out: ${e.getMessage}."
-          )
-        case e: UnknownHostException =>
-          throw new AzureFormRecognizerClientUnknownHostException(
-            s"${serviceEndPointName} cannot resolve a host name: ${e.getMessage}."
-          )
-      }
-  }
+  ): WSClientEngine with WSClientInputStreamExtraAkka =
+    new AzurePlayWSClientEngine(transportSettings)
 }

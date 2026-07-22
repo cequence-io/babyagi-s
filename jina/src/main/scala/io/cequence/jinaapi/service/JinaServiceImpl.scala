@@ -5,10 +5,15 @@ import io.cequence.jinaapi.{JinaClientTimeoutException, JinaClientUnknownHostExc
 import io.cequence.jinaapi.model._
 import io.cequence.jinaapi.JsonFormats._
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
-import io.cequence.wsclient.domain.WsRequestContext
+import io.cequence.wsclient.domain.{
+  CequenceWSTimeoutException,
+  CequenceWSUnknownHostException,
+  SiteBinding,
+  WsRequestContext
+}
 import io.cequence.wsclient.service.WSClientEngine
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
-import io.cequence.wsclient.service.ws.PlayWSClientEngine
+import io.cequence.wsclient.service.spi.{TransportSettings, WSClientEngineRegistry}
 import org.slf4j.LoggerFactory
 
 import java.net.UnknownHostException
@@ -17,7 +22,8 @@ import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future}
 
 private class JinaServiceImpl(
-  apiKey: String
+  apiKey: String,
+  externalEngine: Option[WSClientEngine] = None
 )(
   implicit val ec: ExecutionContext,
   val materializer: Materializer
@@ -29,23 +35,29 @@ private class JinaServiceImpl(
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
-  override protected val engine: WSClientEngine = PlayWSClientEngine(
+  // classpath-discovered engine
+  override protected val engine: WSClientEngine =
+    externalEngine.getOrElse(WSClientEngineRegistry(TransportSettings()))
+
+  override protected def ownsEngine: Boolean = externalEngine.isEmpty
+
+  override protected val site: SiteBinding = SiteBinding(
     coreUrl = "https://",
     requestContext = WsRequestContext(
       authHeaders = Seq(("Authorization", s"Bearer $apiKey"))
     ),
-    recoverErrors = { (serviceEndPointName: String) =>
+    recoverErrors = Some({ (serviceEndPointName: String) =>
       {
-        case e: TimeoutException =>
+        case e @ (_: CequenceWSTimeoutException | _: TimeoutException) =>
           throw new JinaClientTimeoutException(
             s"${serviceEndPointName} timed out: ${e.getMessage}."
           )
-        case e: UnknownHostException =>
+        case e @ (_: CequenceWSUnknownHostException | _: UnknownHostException) =>
           throw new JinaClientUnknownHostException(
             s"${serviceEndPointName} cannot resolve a host name: ${e.getMessage}."
           )
       }
-    }
+    })
   )
 
   object Endpoint {
@@ -211,6 +223,15 @@ object JinaServiceFactory {
     materializer: Materializer
   ): JinaService =
     new JinaServiceImpl(apiKey)
+
+  def withEngine(
+    engine: WSClientEngine,
+    apiKey: String
+  )(
+    implicit ec: ExecutionContext,
+    materializer: Materializer
+  ): JinaService =
+    new JinaServiceImpl(apiKey, Some(engine))
 
   private def getAPIKeyFromEnv(): String =
     Option(System.getenv(envAPIKey)).getOrElse(

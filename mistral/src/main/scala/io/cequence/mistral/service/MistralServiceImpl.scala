@@ -5,10 +5,16 @@ import akka.stream.Materializer
 import io.cequence.mistral.JsonFormats._
 import io.cequence.mistral.{MistralClientException, MistralClientTimeoutException, MistralClientUnknownHostException}
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
-import io.cequence.wsclient.domain.WsRequestContext
+import io.cequence.wsclient.domain.{
+  CequenceWSTimeoutException,
+  CequenceWSUnknownHostException,
+  SiteBinding,
+  WsRequestContext
+}
 import io.cequence.wsclient.service.{PollingHelper, WSClientEngine}
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
-import io.cequence.wsclient.service.ws.{PlayWSClientEngine, Timeouts}
+import io.cequence.wsclient.service.spi.{TransportSettings, WSClientEngineRegistry}
+import io.cequence.wsclient.service.ws.Timeouts
 import io.cequence.mistral.model.Document.DocumentURLChunk
 import io.cequence.mistral.model._
 import org.slf4j.LoggerFactory
@@ -28,7 +34,8 @@ import java.nio.file.{Files, StandardOpenOption}
 private class MistralServiceImpl(
   apiKey: String,
   timeouts: Option[Timeouts] = None,
-  batchPollingIntervalMs: Int = 5000
+  batchPollingIntervalMs: Int = 5000,
+  externalEngine: Option[WSClientEngine] = None
 )(
   implicit val ec: ExecutionContext,
   val materializer: Materializer
@@ -45,24 +52,30 @@ private class MistralServiceImpl(
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
-  override protected val engine: WSClientEngine = PlayWSClientEngine(
+  // classpath-discovered engine
+  override protected val engine: WSClientEngine = externalEngine.getOrElse(
+    WSClientEngineRegistry(TransportSettings(timeouts = timeouts.getOrElse(Timeouts())))
+  )
+
+  override protected def ownsEngine: Boolean = externalEngine.isEmpty
+
+  override protected val site: SiteBinding = SiteBinding(
     coreUrl = "https://api.mistral.ai/v1/",
     requestContext = WsRequestContext(
-      explTimeouts = timeouts,
       authHeaders = Seq(("Authorization", s"Bearer $apiKey"))
     ),
-    recoverErrors = { (serviceEndPointName: String) =>
+    recoverErrors = Some({ (serviceEndPointName: String) =>
       {
-        case e: TimeoutException =>
+        case e @ (_: CequenceWSTimeoutException | _: TimeoutException) =>
           throw new MistralClientTimeoutException(
             s"${serviceEndPointName} timed out: ${e.getMessage}."
           )
-        case e: UnknownHostException =>
+        case e @ (_: CequenceWSUnknownHostException | _: UnknownHostException) =>
           throw new MistralClientUnknownHostException(
             s"${serviceEndPointName} cannot resolve a host name: ${e.getMessage}."
           )
       }
-    }
+    })
   )
 
   object Endpoint {
@@ -542,6 +555,30 @@ object MistralServiceFactory {
     materializer: Materializer
   ): MistralService =
     new MistralServiceImpl(apiKey, timeouts, batchPollingIntervalMs)
+
+  def withEngine(
+    engine: WSClientEngine,
+    apiKey: String,
+    batchPollingIntervalMs: Int = 5000
+  )(
+    implicit ec: ExecutionContext,
+    materializer: Materializer
+  ): MistralService =
+    new MistralServiceImpl(
+      apiKey = apiKey,
+      batchPollingIntervalMs = batchPollingIntervalMs,
+      externalEngine = Some(engine)
+    )
+
+  /** Like `withEngine(engine, apiKey, ...)` but takes the API key from the MISTRAL_API_KEY env variable. */
+  def withEngine(
+    engine: WSClientEngine,
+    batchPollingIntervalMs: Int
+  )(
+    implicit ec: ExecutionContext,
+    materializer: Materializer
+  ): MistralService =
+    withEngine(engine, getAPIKeyFromEnv(), batchPollingIntervalMs)
 
   private def getAPIKeyFromEnv(): String =
     Option(System.getenv(envAPIKey)).getOrElse(
