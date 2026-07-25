@@ -27,6 +27,7 @@ import java.util.UUID
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 
@@ -51,6 +52,10 @@ private class MistralServiceImpl(
 
   // how many not-found (404) poll responses are tolerated for a freshly submitted batch job
   private val batchJobNotFoundMaxTolerated = 3
+
+  // how many not-found (404) responses are tolerated on a GET/reference of a freshly created
+  // file (the files API is eventually consistent, like the batch jobs API)
+  private val fileNotFoundMaxTolerated = 3
 
   private implicit lazy val scheduler: Scheduler = materializer.system.scheduler
 
@@ -201,6 +206,37 @@ private class MistralServiceImpl(
       }
   }
 
+  // Mistral's files API is eventually consistent: a freshly created file can be invisible for a
+  // short while to a follow-up call - a GET, or a POST referencing its id - which then fails
+  // with a 404 "File not found". A bounded number of not-founds is retried (spaced by the
+  // polling delay) instead of failing - the same tolerance awaitBatchJob applies to fresh jobs.
+  // Safe also around creating POSTs: a 404 response means nothing was created.
+  private def withFileNotFoundTolerance[T](
+    description: => String
+  )(
+    call: => Future[T]
+  ): Future[T] = {
+    def attempt(notFoundBudget: Int): Future[T] =
+      call.recoverWith {
+        case _: MistralClientNotFoundException if notFoundBudget > 0 =>
+          logger.warn(
+            s"File not found for ${description} - most likely not visible yet right after its creation. Retrying."
+          )
+          akka.pattern.after(pollingMs.millis, scheduler)(attempt(notFoundBudget - 1))
+      }
+
+    attempt(fileNotFoundMaxTolerated)
+  }
+
+  private def signFileURLTolerant(
+    fileId: UUID,
+    expiryHours: Int,
+    filename: String
+  ): Future[String] =
+    withFileNotFoundTolerance(s"signing the URL of the file ${fileId} (${filename})")(
+      signFileURL(fileId, expiryHours)
+    )
+
   override def signFileURL(
     fileId: UUID,
     expiryHours: Int
@@ -300,9 +336,10 @@ private class MistralServiceImpl(
     val start = new java.util.Date().getTime
 
     for {
-      signedURL <- signFileURL(
+      signedURL <- signFileURLTolerant(
         fileResponse.id,
-        expiryHours = 1
+        expiryHours = 1,
+        filename = fileResponse.filename
       )
 
       _ = logger.debug(s"${fileResponse.filename} signed with URL ${signedURL}")
@@ -451,12 +488,16 @@ private class MistralServiceImpl(
           s"OCR batch input with ${items.size} items uploaded as ${fileResponse.filename} (${fileResponse.id})."
         )
 
-        batchJob <- createBatchJob(
-          endpoint = BatchEndpoint.ocr,
-          inputFileId = fileResponse.id,
-          model = Some(settings.model),
-          metadata = metadata,
-          timeoutHours = timeoutHours
+        batchJob <- withFileNotFoundTolerance(
+          s"creating a batch job for the input file ${fileResponse.id} (${fileResponse.filename})"
+        )(
+          createBatchJob(
+            endpoint = BatchEndpoint.ocr,
+            inputFileId = fileResponse.id,
+            model = Some(settings.model),
+            metadata = metadata,
+            timeoutHours = timeoutHours
+          )
         )
       } yield batchJob
     }
@@ -473,7 +514,9 @@ private class MistralServiceImpl(
         )
 
       case Some(outputFileId) =>
-        downloadFileContent(UUID.fromString(outputFileId)).map { content =>
+        withFileNotFoundTolerance(s"downloading the output file ${outputFileId} of the batch job ${job.id}")(
+          downloadFileContent(UUID.fromString(outputFileId))
+        ).map { content =>
           content
             .split("\n")
             .filter(_.trim.nonEmpty)
@@ -539,7 +582,7 @@ private class MistralServiceImpl(
     for {
       items <- Future.sequence(
         fileResponses.map { case (customId, fileResponse) =>
-          signFileURL(fileResponse.id, expiryHours = signedUrlExpiryHours).map { signedURL =>
+          signFileURLTolerant(fileResponse.id, expiryHours = signedUrlExpiryHours, fileResponse.filename).map { signedURL =>
             OCRBatchItem(
               customId = customId,
               document = Document.DocumentURLChunk(
