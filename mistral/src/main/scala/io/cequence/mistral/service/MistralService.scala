@@ -27,6 +27,13 @@ trait MistralService extends MistralConsts with CloseableService {
     fileName: Option[String] = None
   ): Future[FileUploadResponse]
 
+  /**
+   * @param fileName
+   *   the name (extension included) declared on the multipart upload. Without it Mistral sniffs
+   *   the content type and rejects anything that sniffs as application/octet-stream ("Invalid
+   *   file format", 422) - e.g. a docx whose zip does not start with a Word entry - so pass it
+   *   whenever it is known.
+   */
   def uploadSource(
     source: Source[ByteString, _],
     purpose: Option[String],
@@ -122,9 +129,10 @@ trait MistralService extends MistralConsts with CloseableService {
     signedUrlExpiryHours: Int = 25
   ): Future[Seq[OCRBatchItemResult]]
 
-  // same as uploadWithOCRBatch but accepts (customId, source) pairs instead of files
+  // same as uploadWithOCRBatch but accepts (customId, source, file name) triples instead of
+  // files; the file name is optional but should be provided whenever known - see uploadSource
   def uploadSourceWithOCRBatch(
-    sources: Seq[(String, Source[ByteString, _])],
+    sources: Seq[(String, Source[ByteString, _], Option[String])],
     settings: OCRSettings = Defaults.OCR,
     metadata: Map[String, String] = Map.empty,
     // batch jobs may take up to 24h (the max timeout_hours) to complete, so the signed

@@ -548,7 +548,7 @@ private class MistralServiceImpl(
     Future
       .sequence(
         files.map { case (customId, file) =>
-          uploadFile(file, purpose = Some("ocr"), fileName = None).map(customId -> _)
+          uploadFile(file, purpose = Some("ocr"), fileName = Some(file.getName)).map(customId -> _)
         }
       )
       .flatMap(
@@ -556,15 +556,15 @@ private class MistralServiceImpl(
       )
 
   override def uploadSourceWithOCRBatch(
-    sources: Seq[(String, Source[ByteString, _])],
+    sources: Seq[(String, Source[ByteString, _], Option[String])],
     settings: OCRSettings,
     metadata: Map[String, String],
     signedUrlExpiryHours: Int
   ): Future[Seq[OCRBatchItemResult]] =
     Future
       .sequence(
-        sources.map { case (customId, source) =>
-          uploadSource(source, purpose = Some("ocr"), fileName = None).map(customId -> _)
+        sources.map { case (customId, source, fileName) =>
+          uploadSource(source, purpose = Some("ocr"), fileName = fileName).map(customId -> _)
         }
       )
       .flatMap(
