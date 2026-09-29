@@ -37,6 +37,8 @@ class AzurePlayWSClientEngine(
       val slash = if (coreUrl.endsWith("/")) "" else "/"
 
       import AzureFormRecognizerApiVersion._
+      // v3.x and older use the "formrecognizer" URL segment, v4.0+ (2023-10-31-preview and
+      // later) use "documentintelligence"
       val target = apiVersion match {
         case `v2022_06_30_preview` => URLTargets.formrecognizer
         case `v2022_08_31`         => URLTargets.formrecognizer

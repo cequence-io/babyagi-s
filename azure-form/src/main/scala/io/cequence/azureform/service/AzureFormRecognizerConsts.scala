@@ -4,7 +4,7 @@ import io.cequence.azureform.model.{AzureFormRecognizerApiVersion, AzureFormReco
 
 trait AzureFormRecognizerConsts {
   object Defaults {
-    val version = AzureFormRecognizerApiVersion.v2023_02_28_preview
+    val version = AzureFormRecognizerApiVersion.v2024_11_30
     val readModel = AzureFormRecognizerModelId.prebuilt_read
     val layoutModel = AzureFormRecognizerModelId.prebuilt_layout
     val invoiceModel = AzureFormRecognizerModelId.prebuilt_invoice
