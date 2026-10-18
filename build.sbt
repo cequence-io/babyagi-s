@@ -7,7 +7,7 @@ val scala32 = "3.2.2"
 
 ThisBuild / organization := "io.cequence"
 ThisBuild / scalaVersion := scala213
-ThisBuild / version := "0.1.21"
+ThisBuild / version := "0.1.22"
 ThisBuild / isSnapshot := false
 
 lazy val port = (project in file("babyagi-s-port"))
