@@ -8,12 +8,12 @@ case class OCRSettings(
   includeImageBase64: Option[Boolean] = None,
   imageLimit: Option[Int] = None,
   imageMinSize: Option[Int] = None,
-  // OCR 3/4-era params (mistral-ocr-2512 / mistral-ocr-4-0)
+  // OCR 3/4-era params (mistral-ocr-2512 / mistral-ocr-4-1)
   tableFormat: Option[String] = None, // "markdown" | "html"
   extractHeader: Option[Boolean] = None,
   extractFooter: Option[Boolean] = None,
   includeBlocks: Option[Boolean] = None, // paragraph-level block bounding boxes
-  confidenceScoresGranularity: Option[String] = None, // "word" | "page"
+  confidenceScoresGranularity: Option[String] = None, // "word" | "page" | "block"
   bboxAnnotationFormat: Option[JsObject] = None, // ResponseFormat (json_schema only)
   documentAnnotationFormat: Option[JsObject] = None, // ResponseFormat (json_schema only)
   documentAnnotationPrompt: Option[String] = None
