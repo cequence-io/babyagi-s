@@ -79,6 +79,7 @@ trait CohereService extends CohereConsts with CloseableService {
    * @see
    *   <a href="https://docs.cohere.com/reference/classify">Cohere API Doc</a>
    */
+  @deprecated("The Classify API was removed by Cohere on 2025-09-25 (a 404)")
   def classify(
     inputs: Seq[String],
     examples: Seq[(String, String)],

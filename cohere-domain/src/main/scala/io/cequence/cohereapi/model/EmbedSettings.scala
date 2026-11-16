@@ -3,7 +3,7 @@ package io.cequence.cohereapi.model
 import io.cequence.wsclient.domain.EnumValue
 
 case class EmbedSettings(
-  // The identifier of the model. Defaults to "embed-english-v2.0".
+  // The identifier of the model (the service default: "embed-english-v3.0" with input type search_document).
   // Smaller “light” models are faster, while larger models will perform better.
   // Custom models can also be supplied with their full ID.
   model: String,

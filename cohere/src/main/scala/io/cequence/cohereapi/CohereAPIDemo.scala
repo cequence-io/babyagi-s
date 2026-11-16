@@ -56,28 +56,6 @@ object CohereAPIDemo extends App {
           return_documents = Some(true)
         )
       )
-
-      classifyResponse <- cohereService.classify(
-        inputs = Seq(
-          "Confirm your email address",
-          "hey i need u to send some $"
-        ),
-        examples = Seq(
-          ("Dermatologists don't like her!", "Spam"),
-          ("'Hello, open to this?'", "Spam"),
-          ("I need help please wire me $1000 right now", "Spam"),
-          ("Nice to know you ;)", "Spam"),
-          ("Please help me?", "Spam"),
-          ("Your parcel will be delivered today", "Not spam"),
-          ("Review changes to our Terms and Conditions", "Not spam"),
-          ("Weekly sync notes", "Not spam"),
-          ("'Re: Follow up from today's meeting'", "Not spam"),
-          ("Pre-read for tomorrow", "Not spam")
-        ),
-        settings = ClassifySettings(
-          model = EmbedModelId.embed_english_v3_0
-        )
-      )
     } yield {
       println("Embed response:")
       println("texts: " + embedResponse.texts.mkString(", "))
@@ -86,10 +64,6 @@ object CohereAPIDemo extends App {
 
       println("Rerank response:")
       rerankResponse.results.foreach(println(_))
-      println
-
-      println("Classify response:")
-      classifyResponse.classifications.foreach(println(_))
       cohereService.close()
       System.exit(0)
     }
