@@ -13,13 +13,20 @@ To cover this functionality we rely on [OpenAI](https://github.com/cequence-io/o
 
 **✔️ Important**: We are working now on an improved, cleaner version of BabyAGI, which means we will be functionally and architecturally diverging from the "reference point" - the original ported Scala version. We also provide [Azure form recognizer support](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence) for processing of documents by the AI agent.
 
-**2.0 (this branch, unreleased)** - the client modules (`azure-form-recognizer`, `mistral-client`, `cohere-client`, `jina-client` and their `-domain` modules) no longer depend on Akka: HTTP goes through a pluggable [ws-client](https://github.com/cequence-io/ws-client) engine (1.2.2), the JDK `java.net.http` engine by default, or any other ws-client engine on the classpath (e.g. `ws-client-play-akka` to stay on Play WS + Akka), or one passed to `withEngine`. Upgrading from 0.1.x: drop the implicit `Materializer` / `ActorSystem` (the factories take only an implicit `ExecutionContext`); uploads from a stream take a ws-client `AsyncStream[Bytes]` instead of an Akka `Source[ByteString, _]`; the Azure form recognizer builds its api-version-dependent URLs itself, so `AzurePlayWSClientEngine` is gone and any engine works; Cohere's default embed model is `embed-english-v3.0` (v2.0 was removed by Cohere). The 0.1.x line (Akka) stays on `master`.
+**2.0 (this branch, unreleased)** - the client modules (`azure-form-recognizer`, `mistral-client`, `cohere-client`, `jina-client` and their `-domain` modules) no longer depend on Akka: HTTP goes through a pluggable [ws-client](https://github.com/cequence-io/ws-client) engine (1.2.2) that the caller chooses - e.g. the JDK `java.net.http` engine (`ws-client-jdk`), or `ws-client-play-akka-stream` to stay on Play WS + Akka - see [HTTP backend](#http-backend-). Upgrading from 0.1.x: drop the implicit `Materializer` / `ActorSystem` (the factories take only an implicit `ExecutionContext`); uploads from a stream take a ws-client `AsyncStream[Bytes]` instead of an Akka `Source[ByteString, _]`; the Azure form recognizer builds its api-version-dependent URLs itself, so `AzurePlayWSClientEngine` is gone and any engine works; Cohere's default embed model is `embed-english-v3.0` (v2.0 was removed by Cohere). The 0.1.x line (Akka) stays on `master`.
 
 ## HTTP backend 🔌
 
-The client modules bring the JDK engine (`ws-client-jdk`, no Akka), so they work out of the box. To run on another backend, pick one in any of these ways:
+The client modules depend only on `ws-client-core` - **you choose the HTTP engine** by adding one to your dependencies (without one, creating a service fails with "No WS client engine found"):
 
-- **Classpath** - add an engine module, e.g. `"io.cequence" %% "ws-client-play-akka-stream" % "1.2.2"` (or `ws-client-play-pekko-stream`, `ws-client-pekko-http`, `ws-client-zio-http`, `ws-client-sttp`); the highest-priority engine on the classpath wins over the JDK default. Keep all ws-client artifacts on one version, and Akka and Pekko engines off the same classpath.
+```scala
+"io.cequence" %% "ws-client-jdk" % "1.2.2" // java.net.http, no Akka, fewest dependencies
+// or "io.cequence" %% "ws-client-play-akka-stream" % "1.2.2" // Play WS + Akka
+```
+
+Then pick it in any of these ways:
+
+- **Classpath** - with a single engine module on the classpath (`ws-client-jdk`, `ws-client-play-akka-stream`, `ws-client-play-pekko-stream`, `ws-client-pekko-http`, `ws-client-zio-http`, `ws-client-sttp`, ...) it is used as is; with several, the highest priority wins. Keep all ws-client artifacts on one version, and Akka and Pekko engines off the same classpath.
 - **By id** - with several engines on the classpath, `-Dws-client.engine=play-akka-stream` (or the `ws-client.engine` config key) names one.
 - **Explicitly** - build an engine and pass it to a factory's `withEngine`; one engine can be shared by several services, and a service never closes an engine it was given:
 
@@ -36,7 +43,32 @@ mistral.close(); cohere.close(); engine.close()
 
 The factories without an engine discover one the same way and close it with the service.
 
-**Note:** the JDK engine's HTTP client (like the global `ExecutionContext`) runs on daemon threads, so unlike Play WS + Akka it does not keep the JVM alive - a `main` / `App` that fires requests must wait for its futures (e.g. `Await.ready`) before it returns. The `matrix_jdk` / `matrix_akka` sbt projects (unpublished) run the demos and the engine smoke checks on each backend, e.g. `sbt "matrix_akka/runMain io.cequence.matrix.MistralEngineSmoke"`.
+**Note:** the JDK engine's HTTP client (like the global `ExecutionContext`) runs on daemon threads, so unlike Play WS + Akka it does not keep the JVM alive - a `main` / `App` that fires requests must wait for its futures (e.g. `Await.ready`) before it returns.
+
+## Demos ▶️
+
+The client modules carry no engine, so their demos don't run from the modules themselves (`sbt "cohere_client/runMain ..."` fails with "No WS client engine found"). Run them from one of the unpublished engine-matrix sbt projects instead - each depends on all the client modules plus exactly one engine:
+
+| sbt project   | engine                                      | engine id          |
+|---------------|---------------------------------------------|--------------------|
+| `matrix_jdk`  | `ws-client-jdk` (`java.net.http`, no Akka)  | `jdk`              |
+| `matrix_akka` | `ws-client-play-akka-stream` (Play WS + Akka) | `play-akka-stream` |
+
+```sh
+sbt "matrix_jdk/runMain io.cequence.cohereapi.CohereAPIDemo"
+sbt "matrix_akka/runMain io.cequence.cohereapi.CohereAPIDemo"   # the same demo on Play WS + Akka
+```
+
+| demo (main class)                                | env variables                                                                                      |
+|--------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `io.cequence.mistral.MistralAPIDemo`             | `MISTRAL_API_KEY`, `MISTRAL_TEST_FILE_NAME` (a PDF)                                                |
+| `io.cequence.cohereapi.CohereAPIDemo`            | `COHERE_API_KEY`                                                                                   |
+| `io.cequence.jinaapi.JinaAPIDemo`                | `JINA_API_KEY`, `JINA_TEST_HTML_FILE`, `JINA_TEST_PDF_FILE`                                        |
+| `io.cequence.azureform.AzureFormRecognizerDemo`  | `AZURE_FORM_RECOGNIZER_ENDPOINT`, `AZURE_FORM_RECOGNIZER_API_KEY`, `AZURE_TEST_FILE_NAME`          |
+| `io.cequence.matrix.MistralEngineSmoke`          | `MISTRAL_API_KEY`, `MISTRAL_TEST_FILE_NAME` (a PDF with 2+ pages), optionally `MISTRAL_OCR_MODEL` |
+| `io.cequence.matrix.SharedEngineSmoke`           | `MISTRAL_API_KEY`, `COHERE_API_KEY`                                                                |
+
+The two smoke checks (sources in `matrix/shared`) exercise the clients end to end on the project's engine and fail on any mismatch: `MistralEngineSmoke` covers file and stream uploads, page groups, all OCR params and a batch job (it deletes everything it uploads); `SharedEngineSmoke` shares one engine between Mistral and Cohere as in the snippet above. Runs are forked with `-Dws-client.engine=<engine id>`, so the engine used is always the project's one - the smoke checks print it first.
 
 ## Config ⚙️
 

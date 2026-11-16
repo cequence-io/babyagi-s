@@ -6,7 +6,7 @@ description := "Client and utils for Azure Form Recognizer"
 
 libraryDependencies ++= Seq(
   "io.cequence" %% "ws-client-core" % wsClient,
-  "io.cequence" %% "ws-client-jdk" % wsClient, // the default engine - any other ws-client engine on the classpath with a higher priority is picked instead
+  "io.cequence" %% "ws-client-jdk" % wsClient % Test, // no engine at compile / runtime - a caller brings one (see the README)
   "org.kynosarges" % "tektosyne" % "6.2.0", // Polygon/geometry calculation
 
   "org.scalatest" %% "scalatest" % "3.2.15" % "test",

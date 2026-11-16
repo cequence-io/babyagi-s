@@ -49,8 +49,9 @@ lazy val jina_client =
     .aggregate(jina_client_domain, mistral_client)
     .dependsOn(jina_client_domain)
 
-// unpublished engine matrix: the client modules, their demos and the shared engine smoke checks
-// on one ws-client engine each, e.g. `sbt "matrix_akka/runMain io.cequence.matrix.MistralEngineSmoke"`
+// unpublished engine matrix: the client modules carry no engine (a caller brings one), so their
+// demos and the shared engine smoke checks run here, on one ws-client engine each, e.g.
+// `sbt "matrix_akka/runMain io.cequence.matrix.MistralEngineSmoke"`
 def matrixProject(name: String, engineId: String, engineModules: Seq[ModuleID]) =
   Project(s"matrix_$name", file(s"matrix/$name"))
     .settings(
@@ -64,7 +65,8 @@ def matrixProject(name: String, engineId: String, engineModules: Seq[ModuleID]) 
     )
     .dependsOn(azure_form, cohere_client, mistral_client, jina_client)
 
-lazy val matrix_jdk = matrixProject("jdk", "jdk", Nil)
+lazy val matrix_jdk =
+  matrixProject("jdk", "jdk", Seq("io.cequence" %% "ws-client-jdk" % Dependencies.Versions.wsClient))
 
 lazy val matrix_akka =
   matrixProject("akka", "play-akka-stream", Seq("io.cequence" %% "ws-client-play-akka-stream" % Dependencies.Versions.wsClient))
