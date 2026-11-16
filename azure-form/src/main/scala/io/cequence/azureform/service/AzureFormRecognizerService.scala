@@ -1,7 +1,6 @@
 package io.cequence.azureform.service
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import io.cequence.wsclient.stream.{AsyncStream, Bytes}
 import io.cequence.azureform.model._
 import io.cequence.wsclient.service.CloseableService
 
@@ -17,7 +16,7 @@ trait AzureFormRecognizerService extends AzureFormRecognizerConsts with Closeabl
   ): Future[String]
 
   def analyzeSource(
-    source: Source[ByteString, _],
+    source: AsyncStream[Bytes],
     modelId: String,
   settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[String]
@@ -62,19 +61,19 @@ trait AzureFormRecognizerService extends AzureFormRecognizerConsts with Closeabl
   ): Future[AzureInvoiceResponse]
 
   def analyzeReadSource(
-    source: Source[ByteString, _],
+    source: AsyncStream[Bytes],
     modelId: String = Defaults.readModel,
     settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureReadResponse]
 
   def analyzeLayoutSource(
-    source: Source[ByteString, _],
+    source: AsyncStream[Bytes],
     modelId: String = Defaults.layoutModel,
     settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureLayoutResponse]
 
   def analyzeInvoiceSource(
-    source: Source[ByteString, _],
+    source: AsyncStream[Bytes],
     modelId: String = Defaults.invoiceModel,
     settings: AzureFormRecognizerAnalyzeSettings = AzureFormRecognizerAnalyzeSettings()
   ): Future[AzureInvoiceResponse]

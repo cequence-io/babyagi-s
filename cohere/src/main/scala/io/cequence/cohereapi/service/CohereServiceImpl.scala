@@ -1,6 +1,5 @@
 package io.cequence.cohereapi.service
 
-import akka.stream.Materializer
 import io.cequence.cohereapi.{CohereClientTimeoutException, CohereClientUnknownHostException}
 import io.cequence.cohereapi.model._
 import io.cequence.cohereapi.JsonFormats._
@@ -26,8 +25,7 @@ private class CohereServiceImpl(
   clientName: Option[String],
   externalEngine: Option[WSClientEngine] = None
 )(
-  implicit val ec: ExecutionContext,
-  val materializer: Materializer
+  implicit val ec: ExecutionContext
 ) extends CohereService
     with WSClientWithEngine {
 
@@ -219,8 +217,7 @@ object CohereServiceFactory {
 
   def apply(
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): CohereService =
     apply(getAPIKeyFromEnv(), None)
 
@@ -228,8 +225,7 @@ object CohereServiceFactory {
     apiKey: String,
     clientName: Option[String] = None
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): CohereService =
     new CohereServiceImpl(apiKey, clientName)
 
@@ -238,8 +234,7 @@ object CohereServiceFactory {
     apiKey: String,
     clientName: Option[String] = None
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): CohereService =
     new CohereServiceImpl(apiKey, clientName, Some(engine))
 

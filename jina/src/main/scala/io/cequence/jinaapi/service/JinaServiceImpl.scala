@@ -1,6 +1,5 @@
 package io.cequence.jinaapi.service
 
-import akka.stream.Materializer
 import io.cequence.jinaapi.{JinaClientTimeoutException, JinaClientUnknownHostException}
 import io.cequence.jinaapi.model._
 import io.cequence.jinaapi.JsonFormats._
@@ -25,8 +24,7 @@ private class JinaServiceImpl(
   apiKey: String,
   externalEngine: Option[WSClientEngine] = None
 )(
-  implicit val ec: ExecutionContext,
-  val materializer: Materializer
+  implicit val ec: ExecutionContext
 ) extends JinaService
     with WSClientWithEngine {
 
@@ -211,16 +209,14 @@ object JinaServiceFactory {
 
   def apply(
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): JinaService =
     apply(getAPIKeyFromEnv())
 
   def apply(
     apiKey: String
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): JinaService =
     new JinaServiceImpl(apiKey)
 
@@ -228,8 +224,7 @@ object JinaServiceFactory {
     engine: WSClientEngine,
     apiKey: String
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): JinaService =
     new JinaServiceImpl(apiKey, Some(engine))
 

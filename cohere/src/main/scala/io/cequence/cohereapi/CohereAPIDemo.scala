@@ -1,19 +1,18 @@
 package io.cequence.cohereapi
 
-import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
 import io.cequence.cohereapi.model._
 import io.cequence.cohereapi.service.CohereServiceFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 object CohereAPIDemo extends App {
-  private implicit val actorSystem: ActorSystem = ActorSystem()
-  private implicit val materializer: Materializer = ActorMaterializer()
 
   private val cohereService = CohereServiceFactory()
 
-  {
+  // a JDK-engine HTTP client and the global EC run on daemon threads - wait for the run
+  private val run = {
     for {
       embedResponse <- cohereService.embed(
         texts = Seq(
@@ -72,4 +71,6 @@ object CohereAPIDemo extends App {
     cohereService.close()
     System.exit(1)
   }
+
+  Await.ready(run, Duration.Inf)
 }

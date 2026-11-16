@@ -1,7 +1,5 @@
 package io.cequence.azureform
 
-import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
 import io.cequence.azureform.model.{
   AzureFormRecognizerApiVersion,
   AzureFormRecognizerAnalyzeSettings,
@@ -11,14 +9,12 @@ import io.cequence.azureform.service.{
   AzureFormRecognizerHelper,
   AzureFormRecognizerServiceFactory
 }
-import akka.stream.scaladsl.{Sink, Source => AkkaSource}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.Duration
 
 object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
-
-  private implicit val actorSystem: ActorSystem = ActorSystem()
-  private implicit val materializer: Materializer = ActorMaterializer()
 
   private val fileName = System.getenv("AZURE_TEST_FILE_NAME")
 
@@ -40,11 +36,12 @@ object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
     outputContentFormat = Some(ContentFormat.markdown)
   )
 
-  // run for given versions
-  AkkaSource
-    .fromIterator(() => versions.iterator)
-    .mapAsync(1)(doAux)
-    .runWith(Sink.ignore)
+  // run for the given versions, one after another (and wait for it: a JDK-engine HTTP client and
+  // the global EC run on daemon threads)
+  private val run = versions
+    .foldLeft(Future.successful(())) { (previous, version) =>
+      previous.flatMap(_ => doAux(version).map(_ => ()))
+    }
     .map { _ =>
       System.exit(0)
     }
@@ -53,12 +50,14 @@ object AzureFormRecognizerDemo extends AzureFormRecognizerHelper with App {
       System.exit(1)
     }
 
+  Await.ready(run, Duration.Inf)
+
   private def doAux(version: String) = {
     println("Running for the version: " + version)
 
     val service = AzureFormRecognizerServiceFactory(
-      System.getenv("CRUNCHER_AZURE_FORM_ENDPOINT"),
-      System.getenv("CRUNCHER_AZURE_FORM_API_KEY"),
+      System.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT"),
+      System.getenv("AZURE_FORM_RECOGNIZER_API_KEY"),
       version
     )
 

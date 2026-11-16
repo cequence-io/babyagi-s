@@ -1,7 +1,6 @@
 package io.cequence.azureform.service
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import io.cequence.wsclient.stream.{AsyncStream, Bytes}
 import io.cequence.azureform.model.{
   AzureFormRecognizerAnalyzeSettings,
   AzureInvoiceResponse,
@@ -44,7 +43,7 @@ object AzureFormRecognizerServiceWrapper {
       )
 
     override def analyzeSource(
-      source: Source[ByteString, _],
+      source: AsyncStream[Bytes],
       modelId: String,
       settings: AzureFormRecognizerAnalyzeSettings
     ): Future[String] =
@@ -113,7 +112,7 @@ object AzureFormRecognizerServiceWrapper {
       )
 
     override def analyzeReadSource(
-      source: Source[ByteString, _],
+      source: AsyncStream[Bytes],
       modelId: String,
       settings: AzureFormRecognizerAnalyzeSettings
     ): Future[AzureReadResponse] =
@@ -122,7 +121,7 @@ object AzureFormRecognizerServiceWrapper {
       )
 
     override def analyzeLayoutSource(
-      source: Source[ByteString, _],
+      source: AsyncStream[Bytes],
       modelId: String,
       settings: AzureFormRecognizerAnalyzeSettings
     ): Future[AzureLayoutResponse] =
@@ -131,7 +130,7 @@ object AzureFormRecognizerServiceWrapper {
       )
 
     override def analyzeInvoiceSource(
-      source: Source[ByteString, _],
+      source: AsyncStream[Bytes],
       modelId: String,
       settings: AzureFormRecognizerAnalyzeSettings
     ): Future[AzureInvoiceResponse] =

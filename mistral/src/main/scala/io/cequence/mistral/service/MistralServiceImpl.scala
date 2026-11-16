@@ -1,7 +1,5 @@
 package io.cequence.mistral.service
 
-import akka.actor.Scheduler
-import akka.stream.Materializer
 import io.cequence.mistral.JsonFormats._
 import io.cequence.mistral.{MistralClientException, MistralClientNotFoundException, MistralClientTimeoutException, MistralClientUnknownHostException}
 import io.cequence.wsclient.ResponseImplicits.JsonSafeOps
@@ -11,7 +9,8 @@ import io.cequence.wsclient.domain.{
   SiteBinding,
   WsRequestContext
 }
-import io.cequence.wsclient.service.{PollingHelper, WSClientEngine}
+import io.cequence.wsclient.concurrent.Futures
+import io.cequence.wsclient.service.{PollingHelperCore, WSClientEngine}
 import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
 import io.cequence.wsclient.service.spi.{TransportSettings, WSClientEngineRegistry}
 import io.cequence.wsclient.service.ws.Timeouts
@@ -28,10 +27,12 @@ import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import io.cequence.wsclient.stream.{AsyncStream, Bytes}
 
+import java.nio.channels.FileChannel
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, StandardOpenOption}
+import scala.util.Try
 
 private class MistralServiceImpl(
   apiKey: String,
@@ -39,11 +40,10 @@ private class MistralServiceImpl(
   batchPollingIntervalMs: Int = 5000,
   externalEngine: Option[WSClientEngine] = None
 )(
-  implicit val ec: ExecutionContext,
-  val materializer: Materializer
+  implicit val ec: ExecutionContext
 ) extends MistralService
     with WSClientWithEngine
-    with PollingHelper {
+    with PollingHelperCore {
 
   override protected type PEP = String
   override protected type PT = String
@@ -56,8 +56,6 @@ private class MistralServiceImpl(
   // how many not-found (404) responses are tolerated on a GET/reference of a freshly created
   // file (the files API is eventually consistent, like the batch jobs API)
   private val fileNotFoundMaxTolerated = 3
-
-  private implicit lazy val scheduler: Scheduler = materializer.system.scheduler
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -179,32 +177,30 @@ private class MistralServiceImpl(
     )
 
   override def uploadSource(
-    source: Source[ByteString, _],
+    source: AsyncStream[Bytes],
     purpose: Option[String],
     fileName: Option[String]
-  ): Future[FileUploadResponse] = {
-    val tempFile = Files.createTempFile(s"mistral-upload-${UUID.randomUUID()}", ".tmp")
-    
-    source
-      .runWith(
-        akka.stream.scaladsl.FileIO.toPath(
-          tempFile,
-          Set(StandardOpenOption.CREATE, StandardOpenOption.WRITE)
-        )
-      )
-      .flatMap { _ =>
-        val file = tempFile.toFile
-        file.deleteOnExit() // Ensure the file is deleted when the JVM exits
-        
-        uploadFile(file, purpose, fileName).andThen {
-          case _ => try {
-            Files.deleteIfExists(tempFile) // Try to delete the file immediately after use
-          } catch {
-            case _: Throwable => // Ignore deletion errors
-          }
+  ): Future[FileUploadResponse] =
+    Future {
+      val tempFile = Files.createTempFile(s"mistral-upload-${UUID.randomUUID()}", ".tmp")
+      tempFile.toFile.deleteOnExit() // in case the immediate delete below fails
+      (tempFile, FileChannel.open(tempFile, StandardOpenOption.WRITE))
+    }.flatMap { case (tempFile, channel) =>
+      def deleteTempFile(): Unit =
+        Try(Files.deleteIfExists(tempFile)) // ignore deletion errors
+
+      source
+        .runForeach { bytes =>
+          val buffer = bytes.asByteBuffer
+          while (buffer.hasRemaining) channel.write(buffer)
         }
-      }
-  }
+        .transform { result =>
+          Try(channel.close())
+          result
+        }
+        .flatMap(_ => uploadFile(tempFile.toFile, purpose, fileName))
+        .andThen { case _ => deleteTempFile() }
+    }
 
   // Mistral's files API is eventually consistent: a freshly created file can be invisible for a
   // short while to a follow-up call - a GET, or a POST referencing its id - which then fails
@@ -222,7 +218,7 @@ private class MistralServiceImpl(
           logger.warn(
             s"File not found for ${description} - most likely not visible yet right after its creation. Retrying."
           )
-          akka.pattern.after(pollingMs.millis, scheduler)(attempt(notFoundBudget - 1))
+          Futures.after(pollingMs.millis)(attempt(notFoundBudget - 1))
       }
 
     attempt(fileNotFoundMaxTolerated)
@@ -306,7 +302,7 @@ private class MistralServiceImpl(
       ocrResponse
 
   override def uploadSourceWithOCR(
-    source: Source[ByteString, _],
+    source: AsyncStream[Bytes],
     settings: OCRSettings = Defaults.OCR,
     pageIntervals: Seq[(Int, Int)] = Nil,
     fileName: Option[String] = None
@@ -490,11 +486,11 @@ private class MistralServiceImpl(
         )
       }
 
-      val jsonlContent = ByteString(jsonLines.mkString("\n"))
+      val jsonlContent = Bytes(jsonLines.mkString("\n").getBytes(StandardCharsets.UTF_8))
 
       for {
         fileResponse <- uploadSource(
-          source = Source.single(jsonlContent),
+          source = AsyncStream.single(jsonlContent),
           purpose = Some("batch"),
           fileName = Some(s"ocr-batch-${UUID.randomUUID()}.jsonl")
         )
@@ -571,7 +567,7 @@ private class MistralServiceImpl(
       )
 
   override def uploadSourceWithOCRBatch(
-    sources: Seq[(String, Source[ByteString, _], Option[String])],
+    sources: Seq[(String, AsyncStream[Bytes], Option[String])],
     settings: OCRSettings,
     metadata: Map[String, String],
     signedUrlExpiryHours: Int
@@ -653,8 +649,7 @@ object MistralServiceFactory {
     timeouts: Option[Timeouts] = None,
     batchPollingIntervalMs: Int = 5000
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): MistralService =
     apply(getAPIKeyFromEnv(), timeouts, batchPollingIntervalMs)
 
@@ -662,8 +657,7 @@ object MistralServiceFactory {
     apiKey: String,
     timeouts: Option[Timeouts]
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): MistralService =
     new MistralServiceImpl(apiKey, timeouts)
 
@@ -672,8 +666,7 @@ object MistralServiceFactory {
     timeouts: Option[Timeouts],
     batchPollingIntervalMs: Int
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): MistralService =
     new MistralServiceImpl(apiKey, timeouts, batchPollingIntervalMs)
 
@@ -682,8 +675,7 @@ object MistralServiceFactory {
     apiKey: String,
     batchPollingIntervalMs: Int = 5000
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): MistralService =
     new MistralServiceImpl(
       apiKey = apiKey,
@@ -696,8 +688,7 @@ object MistralServiceFactory {
     engine: WSClientEngine,
     batchPollingIntervalMs: Int
   )(
-    implicit ec: ExecutionContext,
-    materializer: Materializer
+    implicit ec: ExecutionContext
   ): MistralService =
     withEngine(engine, getAPIKeyFromEnv(), batchPollingIntervalMs)
 

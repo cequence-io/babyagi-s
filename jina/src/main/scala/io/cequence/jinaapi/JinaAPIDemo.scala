@@ -1,17 +1,15 @@
 package io.cequence.jinaapi
 
-import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
 import io.cequence.jinaapi.model._
 import io.cequence.jinaapi.service.{JinaChunkingRegex, JinaServiceFactory}
 
 import java.io.File
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 import scala.io.Source
 
 object JinaAPIDemo extends App {
-  private implicit val actorSystem: ActorSystem = ActorSystem()
-  private implicit val materializer: Materializer = ActorMaterializer()
 
   private val service = JinaServiceFactory()
 
@@ -36,7 +34,8 @@ object JinaAPIDemo extends App {
     "新しいメイクのトレンドは鮮やかな色と革新的な技術に焦点を当てています: 今シーズンのメイクアップトレンドは、大胆な色彩と革新的な技術に注目しています。ネオンアイライナーからホログラフィックハイライターまで、クリエイティビティを解き放ち、毎回ユニークなルックを演出しましょう。"
   )
 
-  {
+  // a JDK-engine HTTP client and the global EC run on daemon threads - wait for the run
+  private val run = {
     for {
       crawlResponse1 <- service.crawl(
         "https://www.cnn.com/",
@@ -110,4 +109,6 @@ object JinaAPIDemo extends App {
     service.close()
     System.exit(1)
   }
+
+  Await.ready(run, Duration.Inf)
 }

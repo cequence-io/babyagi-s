@@ -1,7 +1,6 @@
 package io.cequence.mistral.service
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import io.cequence.wsclient.stream.{AsyncStream, Bytes}
 import io.cequence.mistral.model.{BatchJob, BatchJobList, Document, FileDeleteResponse, FileListResponse, FileUploadResponse, OCRBatchItem, OCRBatchItemResult, OCRResponse, OCRSettings}
 import io.cequence.wsclient.service.CloseableService
 
@@ -35,7 +34,7 @@ trait MistralService extends MistralConsts with CloseableService {
    *   whenever it is known.
    */
   def uploadSource(
-    source: Source[ByteString, _],
+    source: AsyncStream[Bytes],
     purpose: Option[String],
     fileName: Option[String] = None
   ): Future[FileUploadResponse]
@@ -62,7 +61,7 @@ trait MistralService extends MistralConsts with CloseableService {
   ): Future[OCRResponse]
 
   def uploadSourceWithOCR(
-    source: Source[ByteString, _],
+    source: AsyncStream[Bytes],
     settings: OCRSettings = Defaults.OCR,
     pageIntervals: Seq[(Int, Int)] = Nil,
     fileName: Option[String] = None
@@ -132,7 +131,7 @@ trait MistralService extends MistralConsts with CloseableService {
   // same as uploadWithOCRBatch but accepts (customId, source, file name) triples instead of
   // files; the file name is optional but should be provided whenever known - see uploadSource
   def uploadSourceWithOCRBatch(
-    sources: Seq[(String, Source[ByteString, _], Option[String])],
+    sources: Seq[(String, AsyncStream[Bytes], Option[String])],
     settings: OCRSettings = Defaults.OCR,
     metadata: Map[String, String] = Map.empty,
     // batch jobs may take up to 24h (the max timeout_hours) to complete, so the signed

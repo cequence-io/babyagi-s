@@ -1,18 +1,15 @@
 package io.cequence.mistral
 
-import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
 import io.cequence.mistral.model._
 import io.cequence.mistral.service.{MistralOCRModel, MistralServiceFactory}
 import io.cequence.wsclient.service.ws.Timeouts
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.Duration
 
 object MistralAPIDemo extends App {
-  private implicit val actorSystem: ActorSystem = ActorSystem()
-  private implicit val materializer: Materializer = ActorMaterializer()
 
   private val service = MistralServiceFactory(
     timeouts = Some(
@@ -33,7 +30,8 @@ object MistralAPIDemo extends App {
       pageIntervals = pageIntervals
     )
 
-  {
+  // a JDK-engine HTTP client and the global EC run on daemon threads - wait for the run
+  private val run = {
     for {
       files <- service.listFiles(Some(0), Some(100))
 
@@ -86,4 +84,6 @@ object MistralAPIDemo extends App {
     service.close()
     System.exit(1)
   }
+
+  Await.ready(run, Duration.Inf)
 }

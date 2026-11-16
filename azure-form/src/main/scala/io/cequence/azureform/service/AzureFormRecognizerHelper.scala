@@ -2,11 +2,11 @@ package io.cequence.azureform.service
 
 import io.cequence.azureform.model._
 import org.slf4j.LoggerFactory
-import io.cequence.wsclient.service.PollingHelper
+import io.cequence.wsclient.service.PollingHelperCore
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelper {
+trait AzureFormRecognizerHelper extends PolygonHelper with PollingHelperCore {
 
   object ReadModelDefaults {
     val linesPerPageForNewLineThreshold = 60
