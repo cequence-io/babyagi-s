@@ -3,7 +3,8 @@ package io.cequence.jinaapi
 import io.cequence.jinaapi.model._
 import io.cequence.jinaapi.service.{JinaChunkingRegex, JinaServiceFactory}
 
-import java.io.File
+import java.nio.file.{Files, Paths}
+import java.util.Base64
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
@@ -13,13 +14,12 @@ object JinaAPIDemo extends App {
 
   private val service = JinaServiceFactory()
 
-  private val testHtmlFile = "xxx"
+  private val testHtmlFile = System.getenv("JINA_TEST_HTML_FILE")
 
-  private val testPdfFile = "xxxx"
+  private val testPdfFile = System.getenv("JINA_TEST_PDF_FILE")
 
-  private val hamletFile = new File(getClass.getResource("/hamlet.txt").getFile)
   private val hamletContent =
-    scala.io.Source.fromFile(hamletFile).mkString.take(20000)
+    Source.fromResource("hamlet.txt").mkString.take(20000)
 
   private val rerankDocuments = Seq(
     "Organic skincare for sensitive skin with aloe vera and chamomile: Imagine the soothing embrace of nature with our organic skincare range, crafted specifically for sensitive skin. Infused with the calming properties of aloe vera and chamomile, each product provides gentle nourishment and protection. Say goodbye to irritation and hello to a glowing, healthy complexion.",
@@ -59,7 +59,8 @@ object JinaAPIDemo extends App {
       _ = println(crawlResponse2)
 
       crawlResponse3 <- service.crawl(
-        Source.fromFile(testPdfFile).mkString,
+        // the reader expects a PDF as base64
+        Base64.getEncoder.encodeToString(Files.readAllBytes(Paths.get(testPdfFile))),
         CrawlSourceType.pdf,
       )
 
