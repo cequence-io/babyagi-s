@@ -36,7 +36,7 @@ private class AzureFormRecognizerServiceImpl(
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
-  // classpath-discovered engine (jdk unless an engine with a higher priority is on the classpath)
+  // classpath-discovered engine
   override protected val engine: WSClientEngine =
     externalEngine.getOrElse(WSClientEngineRegistry(TransportSettings()))
 
