@@ -335,7 +335,7 @@ private class MistralServiceImpl(
   ): Future[OCRResponse] = {
     val start = new java.util.Date().getTime
 
-    for {
+    val ocrFuture = for {
       signedURL <- signFileURLTolerant(
         fileResponse.id,
         expiryHours = 1,
@@ -353,19 +353,34 @@ private class MistralServiceImpl(
         settings = settings,
         pageIntervals = pageIntervals
       )
-
-      deleteResponse <- deleteFile(fileResponse.id)
     } yield {
       logger.info(
         s"OCR response with ${ocrResponse.pages.size} pages with ${pageIntervals.size} groups/splits for file ${fileResponse.filename} obtained in ${new java.util.Date().getTime - start} ms."
       )
-
-      if (!deleteResponse.deleted)
-        logger.warn(s"File ${fileResponse.filename} was not deleted from Mistral API.")
-
       ocrResponse
     }
+
+    // the uploaded file is used only once - delete it whether the OCR succeeded or not
+    ocrFuture.transformWith { ocrResult =>
+      deleteFilesQuietly(Seq(fileResponse.id)).flatMap(_ => Future.fromTry(ocrResult))
+    }
   }
+
+  // deletes the files, logging (not failing on) the ones that could not be deleted
+  private def deleteFilesQuietly(fileIds: Seq[UUID]): Future[Unit] =
+    Future
+      .sequence(
+        fileIds.distinct.map(id =>
+          deleteFile(id)
+            .map { response =>
+              if (!response.deleted) logger.warn(s"File ${id} was not deleted from Mistral API.")
+            }
+            .recover { case e: Throwable =>
+              logger.warn(s"Failed to delete the file ${id}: ${e.getMessage}")
+            }
+        )
+      )
+      .map(_ => ())
 
   override def createBatchJob(
     endpoint: String,
@@ -578,8 +593,8 @@ private class MistralServiceImpl(
     settings: OCRSettings,
     metadata: Map[String, String],
     signedUrlExpiryHours: Int
-  ): Future[Seq[OCRBatchItemResult]] =
-    for {
+  ): Future[Seq[OCRBatchItemResult]] = {
+    val finishedJobFuture = for {
       items <- Future.sequence(
         fileResponses.map { case (customId, fileResponse) =>
           signFileURLTolerant(fileResponse.id, expiryHours = signedUrlExpiryHours, fileResponse.filename).map { signedURL =>
@@ -599,8 +614,10 @@ private class MistralServiceImpl(
       _ = logger.info(s"OCR batch job ${submittedJob.id} submitted with ${items.size} files.")
 
       finishedJob <- awaitBatchJob(submittedJob.id)
+    } yield finishedJob
 
-      results <-
+    finishedJobFuture.transformWith { finishedJobResult =>
+      val resultsFuture = Future.fromTry(finishedJobResult).flatMap { finishedJob =>
         if (finishedJob.status == BatchJobStatus.Success)
           ocrBatchResults(finishedJob)
         else
@@ -610,22 +627,22 @@ private class MistralServiceImpl(
                 finishedJob.errors.map(_.message).mkString("; ")
             )
           )
+      }
 
-      cleanupFileIds =
-        (fileResponses.map(_._2.id) ++
+      // the uploaded documents and the job's own files are used only once - delete them
+      // whatever the outcome (the job's files are known only once it has finished)
+      resultsFuture.transformWith { results =>
+        val jobFileIds = finishedJobResult.toOption.toSeq.flatMap { finishedJob =>
           finishedJob.inputFiles.map(UUID.fromString) ++
-          finishedJob.outputFile.map(UUID.fromString) ++
-          finishedJob.errorFile.map(UUID.fromString)).distinct
+            finishedJob.outputFile.map(UUID.fromString) ++
+            finishedJob.errorFile.map(UUID.fromString)
+        }
 
-      _ <- Future.sequence(
-        cleanupFileIds.map(id =>
-          deleteFile(id).recover { case e: Throwable =>
-            logger.warn(s"Failed to delete a batch-related file ${id}: ${e.getMessage}")
-            FileDeleteResponse(id.toString, deleted = false)
-          }
-        )
-      )
-    } yield results
+        deleteFilesQuietly(fileResponses.map(_._2.id) ++ jobFileIds)
+          .flatMap(_ => Future.fromTry(results))
+      }
+    }
+  }
 }
 
 object MistralServiceFactory {
