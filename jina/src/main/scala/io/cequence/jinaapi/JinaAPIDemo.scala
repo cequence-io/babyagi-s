@@ -59,7 +59,7 @@ object JinaAPIDemo extends App {
       _ = println(crawlResponse2)
 
       crawlResponse3 <- service.crawl(
-        // the reader expects a PDF as base64
+        // a binary PDF goes as base64 (the service passes it through as is)
         Base64.getEncoder.encodeToString(Files.readAllBytes(Paths.get(testPdfFile))),
         CrawlSourceType.pdf,
       )

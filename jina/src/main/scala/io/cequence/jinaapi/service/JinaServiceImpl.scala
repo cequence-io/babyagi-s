@@ -149,7 +149,11 @@ private class JinaServiceImpl(
         )
 
       case CrawlSourceType.pdf =>
-        val encodedPDF = Base64.getEncoder.encodeToString(input.getBytes("UTF-8"))
+        // a PDF already in base64 ("%PDF" encodes to "JVBER") is sent as is, so binary PDFs
+        // survive; otherwise the input is the PDF's text, encoded here
+        val encodedPDF =
+          if (input.startsWith("JVBER")) input
+          else Base64.getEncoder.encodeToString(input.getBytes("UTF-8"))
         Seq(
           Param.pdf -> Some(encodedPDF),
           Param.url -> Some("")

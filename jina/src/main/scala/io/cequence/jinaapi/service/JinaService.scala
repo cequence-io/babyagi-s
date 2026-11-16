@@ -7,6 +7,8 @@ import scala.concurrent.Future
 
 trait JinaService extends JinaConsts with CloseableService {
 
+  // for CrawlSourceType.pdf the input is the PDF as base64 (use this for binary PDFs) or its
+  // raw text, which gets base64-encoded
   def crawl(
     input: String,
     sourceType: CrawlSourceType,
