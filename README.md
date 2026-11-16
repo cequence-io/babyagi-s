@@ -36,7 +36,7 @@ mistral.close(); cohere.close(); engine.close()
 
 The factories without an engine discover one the same way and close it with the service.
 
-**Note:** the JDK engine's HTTP client (like the global `ExecutionContext`) runs on daemon threads, so unlike Play WS + Akka it does not keep the JVM alive - a `main` / `App` that fires requests must wait for its futures (e.g. `Await.ready`) before it returns.
+**Note:** the JDK engine's HTTP client (like the global `ExecutionContext`) runs on daemon threads, so unlike Play WS + Akka it does not keep the JVM alive - a `main` / `App` that fires requests must wait for its futures (e.g. `Await.ready`) before it returns. The `matrix_jdk` / `matrix_akka` sbt projects (unpublished) run the demos and the engine smoke checks on each backend, e.g. `sbt "matrix_akka/runMain io.cequence.matrix.MistralEngineSmoke"`.
 
 ## Config ⚙️
 

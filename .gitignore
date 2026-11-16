@@ -10,3 +10,6 @@ target
 .bloop
 /.bsp
 metals.sbt
+
+# logback FileAppender output of the demos
+application.log
