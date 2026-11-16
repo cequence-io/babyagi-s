@@ -25,14 +25,14 @@ import java.net.UnknownHostException
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 import io.cequence.wsclient.stream.{AsyncStream, Bytes}
 
 import java.nio.channels.FileChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, StandardOpenOption}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 private class MistralServiceImpl(
   apiKey: String,
@@ -590,6 +590,9 @@ private class MistralServiceImpl(
     metadata: Map[String, String],
     signedUrlExpiryHours: Int
   ): Future[Seq[OCRBatchItemResult]] = {
+    // set once the job is submitted - if awaiting it then fails, the job may still be running
+    val submittedJobPromise = Promise[BatchJob]()
+
     val finishedJobFuture = for {
       items <- Future.sequence(
         fileResponses.map { case (customId, fileResponse) =>
@@ -606,6 +609,8 @@ private class MistralServiceImpl(
       )
 
       submittedJob <- ocrBatch(items, settings, metadata)
+
+      _ = submittedJobPromise.success(submittedJob)
 
       _ = logger.info(s"OCR batch job ${submittedJob.id} submitted with ${items.size} files.")
 
@@ -625,16 +630,39 @@ private class MistralServiceImpl(
           )
       }
 
+      def jobFileIds(job: BatchJob) =
+        job.inputFiles.map(UUID.fromString) ++
+          job.outputFile.map(UUID.fromString) ++
+          job.errorFile.map(UUID.fromString)
+
+      val documentIds = fileResponses.map(_._2.id)
+
       // the uploaded documents and the job's own files are used only once - delete them
-      // whatever the outcome (the job's files are known only once it has finished)
-      resultsFuture.transformWith { results =>
-        val jobFileIds = finishedJobResult.toOption.toSeq.flatMap { finishedJob =>
-          finishedJob.inputFiles.map(UUID.fromString) ++
-            finishedJob.outputFile.map(UUID.fromString) ++
-            finishedJob.errorFile.map(UUID.fromString)
+      // whatever the outcome, but never under a job that may still be running: if awaiting a
+      // submitted job failed (e.g. a transient polling error), cancel it first and keep the
+      // files when the cancellation fails, so the job can still read its documents
+      val filesToDeleteFuture: Future[Seq[UUID]] =
+        (finishedJobResult, submittedJobPromise.future.value) match {
+          case (Success(finishedJob), _) =>
+            Future.successful(documentIds ++ jobFileIds(finishedJob))
+
+          case (Failure(_), Some(Success(submittedJob))) =>
+            cancelBatchJob(submittedJob.id)
+              .map(cancelledJob => documentIds ++ jobFileIds(cancelledJob))
+              .recover { case e: Throwable =>
+                logger.warn(
+                  s"Failed to cancel the OCR batch job ${submittedJob.id} (${e.getMessage}) - keeping its files: ${documentIds.mkString(", ")}"
+                )
+                Nil
+              }
+
+          case (Failure(_), _) => // no job was submitted
+            Future.successful(documentIds)
         }
 
-        deleteFilesQuietly(fileResponses.map(_._2.id) ++ jobFileIds)
+      resultsFuture.transformWith { results =>
+        filesToDeleteFuture
+          .flatMap(deleteFilesQuietly)
           .flatMap(_ => Future.fromTry(results))
       }
     }
