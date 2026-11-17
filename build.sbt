@@ -10,9 +10,12 @@ ThisBuild / scalaVersion := scala213
 ThisBuild / version := "2.0.0"
 ThisBuild / isSnapshot := false
 
-lazy val port = (project in file("babyagi-s-port"))
+// only the client modules are published - the root and the BabyAGI apps never are
+publish / skip := true
 
-lazy val next = (project in file("babyagi-s-next"))
+lazy val port = (project in file("babyagi-s-port")).settings(publish / skip := true)
+
+lazy val next = (project in file("babyagi-s-next")).settings(publish / skip := true)
 
 // the published client modules cross-build (`sbt ++2.12.18 jina_client/test`, `+jina_client/publishSigned`)
 val crossBuilt = Seq(crossScalaVersions := Seq(scala212, scala213))
