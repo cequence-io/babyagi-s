@@ -13,7 +13,7 @@ To cover this functionality we rely on [OpenAI](https://github.com/cequence-io/o
 
 **✔️ Important**: We are working now on an improved, cleaner version of BabyAGI, which means we will be functionally and architecturally diverging from the "reference point" - the original ported Scala version. We also provide [Azure form recognizer support](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence) for processing of documents by the AI agent.
 
-**2.0 (this branch, unreleased)** - the client modules (`azure-form-recognizer`, `mistral-client`, `cohere-client`, `jina-client` and their `-domain` modules) no longer depend on Akka: HTTP goes through a pluggable [ws-client](https://github.com/cequence-io/ws-client) engine (1.2.2) that the caller chooses - e.g. the JDK `java.net.http` engine (`ws-client-jdk`), or `ws-client-play-akka-stream` to stay on Play WS + Akka - see [HTTP backend](#http-backend-). Upgrading from 0.1.x: drop the implicit `Materializer` / `ActorSystem` (the factories take only an implicit `ExecutionContext`); uploads from a stream take a ws-client `AsyncStream[Bytes]` instead of an Akka `Source[ByteString, _]`; the Azure form recognizer builds its api-version-dependent URLs itself, so `AzurePlayWSClientEngine` is gone and any engine works; Cohere's default embed model is `embed-english-v3.0` (v2.0 was removed by Cohere), which returns 1024-dim vectors (v2.0: 4096), and `embed` takes a required `inputType` (`search_document` for indexed texts, `search_query` for queries, `classification` or `clustering`) - `EmbedSettings.input_type` is gone. The 0.1.x line (Akka) stays on `master`.
+**2.0 (this branch, unreleased)** - the client modules (`azure-form-recognizer`, `mistral-client`, `cohere-client`, `jina-client` and their `-domain` modules) no longer depend on Akka: HTTP goes through a pluggable [ws-client](https://github.com/cequence-io/ws-client) engine (1.2.2) that the caller chooses - e.g. the JDK `java.net.http` engine (`ws-client-jdk`), or `ws-client-play-akka-stream` to stay on Play WS + Akka - see [HTTP backend](#http-backend-). Upgrading from 0.1.x: drop the implicit `Materializer` / `ActorSystem` (the factories take only an implicit `ExecutionContext`); uploads from a stream take a ws-client `AsyncStream[Bytes]` instead of an Akka `Source[ByteString, _]`; the Azure form recognizer builds its api-version-dependent URLs itself, so `AzurePlayWSClientEngine` is gone and any engine works; Cohere's default embed model is `embed-english-v3.0` (v2.0 was removed by Cohere), which returns 1024-dim vectors (v2.0: 4096), and `embed` takes a required `inputType` (`search_document` for indexed texts, `search_query` for queries, `classification` or `clustering`) - `EmbedSettings.input_type` is gone; the clients no longer bring `logback-classic` or a `logback.xml` (add your own SLF4J binding), and the internal `AzureFormRecognizerEndPoint` enum is gone. The 0.1.x line (Akka) stays on `master`.
 
 ## HTTP backend 🔌
 
@@ -47,7 +47,7 @@ The factories without an engine discover one the same way and close it with the 
 
 ## Demos ▶️
 
-The client modules carry no engine, so their demos don't run from the modules themselves (`sbt "cohere_client/runMain ..."` fails with "No WS client engine found"). Run them from one of the unpublished engine-matrix sbt projects instead - each depends on all the client modules plus exactly one engine:
+The published client modules hold only library code - no engine, no demos, no logging config. The demos, the engine smoke checks and their `logback.xml` live in `matrix/shared` and run from one of the unpublished engine-matrix sbt projects, each of which depends on all the client modules plus exactly one engine (and logback):
 
 | sbt project   | engine                                      | engine id          |
 |---------------|---------------------------------------------|--------------------|
@@ -68,7 +68,7 @@ sbt "matrix_akka/runMain io.cequence.cohereapi.CohereAPIDemo"   # the same demo 
 | `io.cequence.matrix.MistralEngineSmoke`          | `MISTRAL_API_KEY`, `MISTRAL_TEST_FILE_NAME` (a PDF with 2+ pages), optionally `MISTRAL_OCR_MODEL` |
 | `io.cequence.matrix.SharedEngineSmoke`           | `MISTRAL_API_KEY`, `COHERE_API_KEY`                                                                |
 
-The two smoke checks (sources in `matrix/shared`) exercise the clients end to end on the project's engine and fail on any mismatch: `MistralEngineSmoke` covers file and stream uploads, page groups, all OCR params and a batch job (it deletes everything it uploads); `SharedEngineSmoke` shares one engine between Mistral and Cohere as in the snippet above. Runs are forked with `-Dws-client.engine=<engine id>`, so the engine used is always the project's one - the smoke checks print it first.
+The two smoke checks exercise the clients end to end on the project's engine and fail on any mismatch: `MistralEngineSmoke` covers file and stream uploads, page groups, all OCR params and a batch job (it deletes everything it uploads); `SharedEngineSmoke` shares one engine between Mistral and Cohere as in the snippet above. Runs are forked with `-Dws-client.engine=<engine id>`, so the engine used is always the project's one - the smoke checks print it first.
 
 ## Config ⚙️
 
