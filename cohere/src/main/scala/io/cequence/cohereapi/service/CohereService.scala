@@ -17,6 +17,10 @@ trait CohereService extends CohereConsts with CloseableService {
    * @param texts
    *   An array of strings for the model to embed. Maximum number of texts per call is 96. We
    *   recommend reducing the length of each text to be under 512 tokens for optimal quality.
+   * @param inputType
+   *   What the texts are used for, required by the v3+ models: search_document (texts stored
+   *   in a vector index), search_query (search queries against such an index), classification
+   *   or clustering. Queries and documents of a search must be embedded with their own type.
    * @param settings
    * @return
    *
@@ -25,6 +29,7 @@ trait CohereService extends CohereConsts with CloseableService {
    */
   def embed(
     texts: Seq[String],
+    inputType: InputType,
     settings: EmbedSettings = Defaults.Embed
   ): Future[EmbedResponse]
 

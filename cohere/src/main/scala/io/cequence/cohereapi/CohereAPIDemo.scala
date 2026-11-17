@@ -19,9 +19,9 @@ object CohereAPIDemo extends App {
           "hello",
           "goodbye"
         ),
+        inputType = InputType.classification,
         settings = EmbedSettings(
-          model = EmbedModelId.embed_english_v3_0,
-          input_type = Some(InputType.classification)
+          model = EmbedModelId.embed_english_v3_0
         )
       )
 

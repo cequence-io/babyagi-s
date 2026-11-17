@@ -3,14 +3,11 @@ package io.cequence.cohereapi.model
 import io.cequence.wsclient.domain.EnumValue
 
 case class EmbedSettings(
-  // The identifier of the model (the service default: "embed-english-v3.0" with input type search_document).
+  // The identifier of the model (the service default: "embed-english-v3.0").
   // Smaller “light” models are faster, while larger models will perform better.
   // Custom models can also be supplied with their full ID.
+  // (The input type is not a setting - it is a required parameter of CohereService.embed.)
   model: String,
-
-  // Specifies the type of input passed to the model.
-  // Required for embedding models v3 and higher.
-  input_type: Option[InputType] = None,
 
   // Specifies the types of embeddings you want to get back.
   // Not required and default is None, which returns the Embed Floats response type.

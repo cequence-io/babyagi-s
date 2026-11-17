@@ -1,5 +1,6 @@
 package io.cequence.matrix
 
+import io.cequence.cohereapi.model.InputType
 import io.cequence.cohereapi.service.CohereServiceFactory
 import io.cequence.mistral.service.MistralServiceFactory
 import io.cequence.wsclient.service.spi.{TransportSettings, WSClientEngineRegistry}
@@ -22,7 +23,7 @@ object SharedEngineSmoke extends App {
   private val run = {
     for {
       files <- mistral.listFiles(Some(0), Some(1))
-      embed <- cohere.embed(Seq("ws-client engine smoke"))
+      embed <- cohere.embed(Seq("ws-client engine smoke"), InputType.search_document)
       _ = { mistral.close(); cohere.close() }
       // a service never closes an engine it was given
       afterClose <- MistralServiceFactory.withEngine(engine, apiKey = sys.env("MISTRAL_API_KEY")).listFiles(Some(0), Some(1))

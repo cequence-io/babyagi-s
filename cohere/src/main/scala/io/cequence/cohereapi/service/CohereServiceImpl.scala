@@ -108,6 +108,7 @@ private class CohereServiceImpl(
 
   override def embed(
     texts: Seq[String],
+    inputType: InputType,
     settings: EmbedSettings
   ): Future[EmbedResponse] = {
     assert(texts.nonEmpty, "texts must not be empty")
@@ -117,7 +118,7 @@ private class CohereServiceImpl(
       bodyParams = jsonBodyParams(
         Param.texts -> Some(texts),
         Param.model -> Some(settings.model),
-        Param.input_type -> settings.input_type.map(_.toString()),
+        Param.input_type -> Some(inputType.toString()),
         Param.embedding_types -> (
           if (settings.embedding_types.nonEmpty)
             Some(settings.embedding_types.map(_.toString()))
