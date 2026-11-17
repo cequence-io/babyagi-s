@@ -29,10 +29,8 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 import io.cequence.wsclient.stream.{AsyncStream, Bytes}
 
-import java.nio.channels.FileChannel
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, StandardOpenOption}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 private class MistralServiceImpl(
   apiKey: String,
@@ -56,6 +54,9 @@ private class MistralServiceImpl(
   // how many not-found (404) responses are tolerated on a GET/reference of a freshly created
   // file (the files API is eventually consistent, like the batch jobs API)
   private val fileNotFoundMaxTolerated = 3
+
+  // how many file uploads / deletes of one batch run at a time
+  private val maxParallelFileCalls = 8
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -181,25 +182,10 @@ private class MistralServiceImpl(
     purpose: Option[String],
     fileName: Option[String]
   ): Future[FileUploadResponse] =
-    Future {
-      val tempFile = Files.createTempFile(s"mistral-upload-${UUID.randomUUID()}", ".tmp")
-      tempFile.toFile.deleteOnExit() // in case the immediate delete below fails
-      (tempFile, FileChannel.open(tempFile, StandardOpenOption.WRITE))
-    }.flatMap { case (tempFile, channel) =>
-      def deleteTempFile(): Unit =
-        Try(Files.deleteIfExists(tempFile)) // ignore deletion errors
-
-      source
-        .runForeach { bytes =>
-          val buffer = bytes.asByteBuffer
-          while (buffer.hasRemaining) channel.write(buffer)
-        }
-        .transform { result =>
-          Try(channel.close())
-          result
-        }
-        .flatMap(_ => uploadFile(tempFile.toFile, purpose, fileName))
-        .andThen { case _ => deleteTempFile() }
+    TempFileSink(source, prefix = s"mistral-upload-${UUID.randomUUID()}").flatMap { tempFile =>
+      uploadFile(tempFile.toFile, purpose, fileName).andThen { case _ =>
+        TempFileSink.delete(tempFile)
+      }
     }
 
   // Mistral's files API is eventually consistent: a freshly created file can be invisible for a
@@ -364,19 +350,17 @@ private class MistralServiceImpl(
 
   // deletes the files, logging (not failing on) the ones that could not be deleted
   private def deleteFilesQuietly(fileIds: Seq[UUID]): Future[Unit] =
-    Future
-      .sequence(
-        fileIds.distinct.map(id =>
-          deleteFile(id)
-            .map { response =>
-              if (!response.deleted) logger.warn(s"File ${id} was not deleted from Mistral API.")
-            }
-            .recover { case e: Throwable =>
-              logger.warn(s"Failed to delete the file ${id}: ${e.getMessage}")
-            }
-        )
-      )
-      .map(_ => ())
+    inBoundedParallel(
+      fileIds.distinct.map { id => () =>
+        deleteFile(id)
+          .map { response =>
+            if (!response.deleted) logger.warn(s"File ${id} was not deleted from Mistral API.")
+          }
+          .recover { case e: Throwable =>
+            logger.warn(s"Failed to delete the file ${id}: ${e.getMessage}")
+          }
+      }
+    ).map(_ => ())
 
   override def createBatchJob(
     endpoint: String,
@@ -509,7 +493,10 @@ private class MistralServiceImpl(
             metadata = metadata,
             timeoutHours = timeoutHours
           )
-        )
+        ).recoverWith { case e: Throwable =>
+          // no job references the input file - it is of no further use
+          deleteFilesQuietly(Seq(fileResponse.id)).flatMap(_ => Future.failed(e))
+        }
       } yield batchJob
     }
 
@@ -556,15 +543,13 @@ private class MistralServiceImpl(
     metadata: Map[String, String],
     signedUrlExpiryHours: Int
   ): Future[Seq[OCRBatchItemResult]] =
-    Future
-      .sequence(
-        files.map { case (customId, file) =>
-          uploadFile(file, purpose = Some("ocr"), fileName = Some(file.getName)).map(customId -> _)
-        }
-      )
-      .flatMap(
-        uploadWithOCRBatchAux(_, settings, metadata, signedUrlExpiryHours)
-      )
+    uploadAllOrNone(
+      files.map { case (customId, file) =>
+        () => uploadFile(file, purpose = Some("ocr"), fileName = Some(file.getName)).map(customId -> _)
+      }
+    ).flatMap(
+      uploadWithOCRBatchAux(_, settings, metadata, signedUrlExpiryHours)
+    )
 
   override def uploadSourceWithOCRBatch(
     sources: Seq[(String, AsyncStream[Bytes], Option[String])],
@@ -572,15 +557,41 @@ private class MistralServiceImpl(
     metadata: Map[String, String],
     signedUrlExpiryHours: Int
   ): Future[Seq[OCRBatchItemResult]] =
-    Future
-      .sequence(
-        sources.map { case (customId, source, fileName) =>
-          uploadSource(source, purpose = Some("ocr"), fileName = fileName).map(customId -> _)
+    uploadAllOrNone(
+      sources.map { case (customId, source, fileName) =>
+        () => uploadSource(source, purpose = Some("ocr"), fileName = fileName).map(customId -> _)
+      }
+    ).flatMap(
+      uploadWithOCRBatchAux(_, settings, metadata, signedUrlExpiryHours)
+    )
+
+  // runs the uploads (at most maxParallelFileCalls at a time) and waits for all of them to
+  // settle; if any fails, the files that did upload are deleted and the first failure returned
+  private def uploadAllOrNone(
+    uploads: Seq[() => Future[(String, FileUploadResponse)]]
+  ): Future[Seq[(String, FileUploadResponse)]] =
+    inBoundedParallel(uploads.map(upload => () => upload().transform(Success(_)))).flatMap {
+      results =>
+        val uploaded = results.collect { case Success(response) => response }
+
+        results.collectFirst { case Failure(e) => e } match {
+          case None =>
+            Future.successful(uploaded)
+
+          case Some(e) =>
+            deleteFilesQuietly(uploaded.map(_._2.id)).flatMap(_ => Future.failed(e))
         }
-      )
-      .flatMap(
-        uploadWithOCRBatchAux(_, settings, metadata, signedUrlExpiryHours)
-      )
+    }
+
+  // runs the calls at most maxParallelFileCalls at a time, keeping their order - a batch of
+  // hundreds of files must not fire hundreds of uploads (each buffered in memory) or deletes at once
+  private def inBoundedParallel[T](
+    calls: Seq[() => Future[T]]
+  ): Future[Seq[T]] =
+    calls.grouped(maxParallelFileCalls).foldLeft(Future.successful(Vector.empty[T])) {
+      (accFuture, group) =>
+        accFuture.flatMap(acc => Future.sequence(group.map(_())).map(acc ++ _))
+    }
 
   // shared post-upload orchestration: sign URLs -> submit an OCR batch job -> await its
   // completion -> parse the results -> delete all the intermediate files
