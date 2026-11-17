@@ -10,15 +10,11 @@ import io.cequence.wsclient.service.WSClientWithEngineTypes.WSClientWithEngine
 import io.cequence.wsclient.service.spi.{TransportSettings, WSClientEngineRegistry}
 import io.cequence.wsclient.stream.{AsyncStream, Bytes}
 import org.slf4j.LoggerFactory
-import play.api.libs.json.JsValue
 
 import java.io.File
 import java.net.UnknownHostException
-import java.nio.channels.FileChannel
-import java.nio.file.{Files, Path, StandardOpenOption}
 import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
 
 private class AzureFormRecognizerServiceImpl(
   endPoint: String,
@@ -31,7 +27,9 @@ private class AzureFormRecognizerServiceImpl(
     with WSClientWithEngine
     with AzureFormRecognizerHelper {
 
-  override protected type PEP = AzureFormRecognizerEndPoint
+  // the endpoint is `{modelId}:analyze` or `{modelId}/analyzeResults` (+ the results id as the
+  // endpoint param), under the api-version-dependent core URL - see AzureFormRecognizerURL
+  override protected type PEP = String
   override protected type PT = AzureFormRecognizerParam
 
   protected val logger = LoggerFactory.getLogger(this.getClass)
@@ -43,7 +41,7 @@ private class AzureFormRecognizerServiceImpl(
   override protected def ownsEngine: Boolean = externalEngine.isEmpty
 
   override protected val site: SiteBinding = SiteBinding(
-    coreUrl = endPoint,
+    coreUrl = AzureFormRecognizerURL.documentModels(endPoint, apiVersion),
     requestContext = WsRequestContext(
       authHeaders = Seq(
         "Ocp-Apim-Subscription-Key" -> apiKey
@@ -72,8 +70,7 @@ private class AzureFormRecognizerServiceImpl(
     settings: AzureFormRecognizerAnalyzeSettings
   ): Future[String] =
     execPOSTRich(
-      AzureFormRecognizerEndPoint.analyze,
-      endPointParam = endPointParamAux(modelId),
+      analyzeEndPoint(modelId),
       params = paramsAux(settings),
       bodyParams = jsonBodyParams(
         params = AzureFormRecognizerParam.urlSource -> Some(urlSource)
@@ -86,127 +83,27 @@ private class AzureFormRecognizerServiceImpl(
     settings: AzureFormRecognizerAnalyzeSettings
   ): Future[String] =
     execPOSTFileRich(
-      AzureFormRecognizerEndPoint.analyze,
-      endPointParam = endPointParamAux(modelId),
+      analyzeEndPoint(modelId),
       urlParams = paramsAux(settings),
       file = file
     ).map(getOperationLocation)
 
-  // the stream is written to a temp file and sent like analyze(file) - any engine, the same request
+  // the stream is written to a temp file and sent like analyze(file) - ws-client-core has no
+  // engine-agnostic streamed request body
   override def analyzeSource(
     source: AsyncStream[Bytes],
     modelId: String,
     settings: AzureFormRecognizerAnalyzeSettings
   ): Future[String] =
-    writeToTempFile(source).flatMap { tempFile =>
+    TempFileSink(source, prefix = "azure-form-upload-").flatMap { tempFile =>
       analyze(tempFile.toFile, modelId, settings).andThen { case _ =>
-        Try(Files.deleteIfExists(tempFile))
+        TempFileSink.delete(tempFile)
       }
     }
 
-  private def writeToTempFile(source: AsyncStream[Bytes]): Future[Path] =
-    Future {
-      val tempFile = Files.createTempFile("azure-form-upload-", ".tmp")
-      (tempFile, FileChannel.open(tempFile, StandardOpenOption.WRITE))
-    }.flatMap { case (tempFile, channel) =>
-      source
-        .runForeach { bytes =>
-          val buffer = bytes.asByteBuffer
-          while (buffer.hasRemaining) channel.write(buffer)
-        }
-        .transform { result =>
-          Try(channel.close())
-          result match {
-            case Success(_) =>
-              Success(tempFile)
+  private def analyzeEndPoint(modelId: String) = s"${modelId}:analyze"
 
-            case Failure(e) =>
-              Try(Files.deleteIfExists(tempFile))
-              Failure(e)
-          }
-        }
-    }
-
-  // Azure's api-version-dependent URL scheme (AzureFormRecognizerURL) - the engines get the whole URL as the site's
-  // core URL with no endpoint (a 1.x engine subclass, AzurePlayWSClientEngine, rewrote it inside Play WS)
-
-  private def azureSite(
-    endPoint: PEP,
-    endPointParam: Option[String]
-  ): SiteBinding =
-    site.copy(coreUrl = AzureFormRecognizerURL(site.coreUrl, endPoint.toString, endPointParam))
-
-  override def execGETRich(
-    endPoint: PEP,
-    endPointParam: Option[String],
-    params: Seq[(PT, Option[Any])],
-    extraHeaders: Seq[(String, String)],
-    acceptableStatusCodes: Seq[Int]
-  ): Future[RichResponse] =
-    inFuture(azureSite(endPoint, endPointParam)) { azure =>
-      engine.execGETRich(
-        azure,
-        endPoint = "",
-        endPointParam = None,
-        paramTuplesToStrings(params),
-        extraHeaders,
-        acceptableStatusCodes
-      )
-    }
-
-  override def execPOSTRich(
-    endPoint: PEP,
-    endPointParam: Option[String],
-    params: Seq[(PT, Option[Any])],
-    bodyParams: Seq[(PT, Option[JsValue])],
-    extraHeaders: Seq[(String, String)],
-    acceptableStatusCodes: Seq[Int]
-  ): Future[RichResponse] =
-    inFuture(azureSite(endPoint, endPointParam)) { azure =>
-      engine.execPOSTRich(
-        azure,
-        endPoint = "",
-        endPointParam = None,
-        paramTuplesToStrings(params),
-        paramTuplesToStrings(bodyParams),
-        extraHeaders,
-        acceptableStatusCodes
-      )
-    }
-
-  override def execPOSTFileRich(
-    endPoint: PEP,
-    endPointParam: Option[String],
-    urlParams: Seq[(PT, Option[Any])],
-    file: File,
-    extraHeaders: Seq[(String, String)],
-    acceptableStatusCodes: Seq[Int]
-  ): Future[RichResponse] =
-    inFuture(azureSite(endPoint, endPointParam)) { azure =>
-      engine.execPOSTFileRich(
-        azure,
-        endPoint = "",
-        endPointParam = None,
-        paramTuplesToStrings(urlParams),
-        file,
-        extraHeaders,
-        acceptableStatusCodes
-      )
-    }
-
-  // a malformed endpoint param fails the call's future, never the caller's thread
-  private def inFuture[T](
-    azure: => SiteBinding
-  )(
-    call: SiteBinding => Future[T]
-  ): Future[T] =
-    Try(azure) match {
-      case Success(binding) =>
-        call(binding)
-
-      case Failure(e) =>
-        Future.failed(e)
-    }
+  private def analyzeResultsEndPoint(modelId: String) = s"${modelId}/analyzeResults"
 
   private def getOperationLocation(response: RichResponse) = {
     val headers = response.headers
@@ -230,8 +127,8 @@ private class AzureFormRecognizerServiceImpl(
     modelId: String
   ): Future[AzureReadResponse] =
     execGET(
-      AzureFormRecognizerEndPoint.analyzeResults,
-      endPointParam = endPointParamAux(modelId, Some(resultsId))
+      analyzeResultsEndPoint(modelId),
+      endPointParam = Some(resultsId)
     ).map(
       _.asSafeJson[AzureReadResponse]
     )
@@ -241,8 +138,8 @@ private class AzureFormRecognizerServiceImpl(
     modelId: String
   ): Future[AzureLayoutResponse] =
     execGET(
-      AzureFormRecognizerEndPoint.analyzeResults,
-      endPointParam = endPointParamAux(modelId, Some(resultsId))
+      analyzeResultsEndPoint(modelId),
+      endPointParam = Some(resultsId)
     ).map(
       _.asSafeJson[AzureLayoutResponse]
     )
@@ -252,19 +149,11 @@ private class AzureFormRecognizerServiceImpl(
     modelId: String
   ): Future[AzureInvoiceResponse] =
     execGET(
-      AzureFormRecognizerEndPoint.analyzeResults,
-      endPointParam = endPointParamAux(modelId, Some(resultsId))
+      analyzeResultsEndPoint(modelId),
+      endPointParam = Some(resultsId)
     ).map(
       _.asSafeJson[AzureInvoiceResponse]
     )
-
-  private def endPointParamAux(
-    modelId: String,
-    resultsId: Option[String] = None
-  ) = resultsId match {
-    case Some(id) => Some(apiVersion + "," + modelId + "," + id)
-    case None     => Some(apiVersion + "," + modelId)
-  }
 
   private def paramsAux(settings: AzureFormRecognizerAnalyzeSettings) =
     Seq(
